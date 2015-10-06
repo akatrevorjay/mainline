@@ -7,15 +7,13 @@ import threading
 import functools
 import collections
 import inspect
-import decorator
 import wrapt
 
 
-# scopes are callables that return the partitioning key
-SCOPE_SINGLETON = lambda: 'singleton'
-# TODO This should really go in thread local so it's removed with the thread
-SCOPE_THREAD = lambda: 'thread_%s' % threading.current_thread().ident
-SCOPE_NONE = lambda: None
+# scopes are callables that return a scope dictionary
+SCOPE_SINGLETON = lambda self, scopes: scopes['singleton']
+SCOPE_THREAD = lambda self, scopes: self._thread_local.scope[threading.current_thread().ident]
+SCOPE_NONE = lambda self, scopes: None
 
 
 class Di(object):
@@ -27,19 +25,18 @@ class Di(object):
 
     def __init__(self, *args, **kwargs):
         self._factories = {}
-        self._scoped_instances = collections.defaultdict(lambda: collections.defaultdict(dict))
+        self._scoped_instances = collections.defaultdict(dict)
         self._depends_key = collections.defaultdict(set)
         self._depends_obj = collections.defaultdict(set)
 
         self.on_change = events.Event()
         self.on_key_change = events.EventManager()
 
-        self._update_cls_props = collections.defaultdict(set)
-        self.on_change += self._on_change_update_depends_cls_props
-
-    def _on_change_update_depends_cls_props(self, key, value):
-        for klass, property_name in self._update_cls_props.get(key, []):
-            setattr(klass, property_name, value)
+    @property
+    def _thread_local(self):
+        self._thread_local = threading.local()
+        self._thread_local.scope = dict()
+        return self._thread_local
 
     def _add_factory(self, key, factory, scope):
         if not callable(factory):
@@ -72,8 +69,7 @@ class Di(object):
         if callable(scope):
             # s = self.scoped_instances[scope]
             s = self._scoped_instances
-
-            key = scope()
+            key = scope(self, s)
             if key:
                 return s[key]
 
@@ -96,11 +92,12 @@ class Di(object):
     def resolve_many(self, *names):
         return [self.resolve(name) for name in names]
 
-    def depends_on(self, key, obj=None):
+    def depends_on(self, keys, obj=None):
         if obj is None:
-            return functools.partial(self.depends_on, key)
-        self._depends_key[key].add(obj)
-        self._depends_obj[obj].add(key)
+            return functools.partial(self.depends_on, keys)
+        for k in keys:
+            self._depends_key[k].add(obj)
+            self._depends_obj[obj].add(k)
         return obj
 
     def missing_depends(self, obj):
@@ -124,20 +121,16 @@ class Di(object):
             setattr(cls, name, val)
         return val
 
-    def provide_classproperty(self, key, klass=None, name=None, replace_on_access=True, update_on_change=False):
+    def provide_classproperty(self, key, klass=None, name=None, replace_on_access=True):
         if klass is None:
             return functools.partial(self.provide_classproperty, key, name=name,
-                                     replace_on_access=replace_on_access, update_on_change=update_on_change)
+                                     replace_on_access=replace_on_access)
 
         if not name:
             name = key
 
         # Register as dependency for klass
         self.depends_on(key, klass)
-
-        if update_on_change:
-            # Allow to update later
-            self._update_cls_props[key].add((klass, name))
 
         # Add in arguments
         partial = functools.partial(self._wrap_classproperty, klass, key, name, replace_on_access)
@@ -150,27 +143,26 @@ class Di(object):
         # Return class as this is a decorator
         return klass
 
-    def provide_args(self, wrapped=None, names=None):
+    def provide_args(self, wrapped=None, keys=None):
         if wrapped is None:
             return functools.partial(self.provide_args,
-                                     names=names)
+                                     names=keys)
 
-        if names:
-            for n in names:
+        if keys:
+            for n in keys:
                 self.depends_on(n, wrapped)
         else:
-            names = self._depends_obj[wrapped]
+            keys = self._depends_obj[wrapped]
 
         # HACK Remove the number of arguments from the wrapped function's argspec
         spec = inspect.getargspec(wrapped)
-        args = spec.args[len(names):]
-        # spec.__dict__['args'] = spec.args[len(names):]
+        args = spec.args[len(keys):]
         spec = inspect.ArgSpec(args, *spec[1:])
+        # spec.__dict__['args'] = spec.args[len(names):]
 
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, args, kwargs):
-            injected_args = self.resolve_deps(wrapped)
-            # injected_args = self.resolve_many(*names)
+            injected_args = self.resolve_many(*keys)
 
             def _execute(*_args, **_kwargs):
                 if _args:
