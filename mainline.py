@@ -10,27 +10,31 @@ import inspect
 import wrapt
 
 
-# scopes are callables that return a scope dictionary
-SCOPE_SINGLETON = lambda self, scopes: scopes['singleton']
-SCOPE_THREAD = lambda self, scopes: self._thread_local.scope[threading.current_thread().ident]
-SCOPE_NONE = lambda self, scopes: None
-
-
 class Di(object):
-    SCOPE_SINGLETON = SCOPE_SINGLETON
-    SCOPE_THREAD = SCOPE_THREAD
-    SCOPE_NONE = SCOPE_NONE
+    # scopes are callables that return a scope dictionary
+    SCOPE_SINGLETON = lambda self, scopes: scopes['singleton']
+    SCOPE_THREAD = lambda self, scopes: self._thread_local.scope[threading.current_thread().ident]
+    SCOPE_NONE = lambda self, scopes: None
 
     Factory = collections.namedtuple('Factory', ['factory', 'scope'])
 
-    def __init__(self, *args, **kwargs):
+    events = False
+
+    def __init__(self):
         self._factories = {}
         self._scoped_instances = collections.defaultdict(dict)
         self._depends_key = collections.defaultdict(set)
         self._depends_obj = collections.defaultdict(set)
 
-        self.on_change = events.Event()
-        self.on_key_change = events.EventManager()
+        if self.events:
+            self.on_change = events.Event()
+            self.on_key_change = events.EventManager()
+
+    def _on_change(self, key, factory):
+        if not self.events:
+            return
+        self.on_change(key, factory)
+        self.on_key_change.fire(key, key, factory)
 
     @property
     def _thread_local(self):
@@ -41,11 +45,9 @@ class Di(object):
     def _add_factory(self, key, factory, scope):
         if not callable(factory):
             raise ValueError(factory)
-
-        self._factories[key] = self.Factory(factory, scope)
-
-        self.on_change(key, factory)
-        self.on_key_change.fire(key, key, factory)
+        f = self.Factory(factory, scope)
+        self._factories[key] = f
+        self._on_change(key, f)
         return factory
 
     def register(self, key, factory=None, scope=SCOPE_SINGLETON):
@@ -143,33 +145,34 @@ class Di(object):
         # Return class as this is a decorator
         return klass
 
-    def provide_args(self, wrapped=None, keys=None):
+    def provide_args(self, wrapped=None, args=None):
         if wrapped is None:
             return functools.partial(self.provide_args,
-                                     keys=keys)
+                                     args=args)
 
-        if keys:
-            for n in keys:
-                self.depends_on(n, wrapped)
+        if args:
+            map(self.depends_on, args)
         else:
-            keys = self._depends_obj[wrapped]
+            args = self._depends_obj[wrapped]
 
         # HACK Remove the number of arguments from the wrapped function's argspec
         spec = inspect.getargspec(wrapped)
-        args = spec.args[len(keys):]
-        spec = inspect.ArgSpec(args, *spec[1:])
-        # spec.__dict__['args'] = spec.args[len(names):]
+        sargs = spec.args[len(args):]
+
+        # Update argspec
+        spec = inspect.ArgSpec(sargs, *spec[1:])
+        # spec.__dict__['args'] = sargs
 
         @wrapt.decorator(adapter=spec)
-        def wrapper(wrapped, instance, args, kwargs):
-            injected_args = self.resolve_many(*keys)
+        def wrapper(wrapped, instance, wargs, wkwargs):
+            injected_args = self.resolve_many(*args)
 
-            def _execute(*_args, **_kwargs):
-                if _args:
-                    injected_args.extend(_args)
-                return wrapped(*injected_args, **_kwargs)
+            def _execute(*_wargs, **_wkwargs):
+                if _wargs:
+                    injected_args.extend(_wargs)
+                return wrapped(*injected_args, **_wkwargs)
 
-            return _execute(*args, **kwargs)
+            return _execute(*wargs, **wkwargs)
 
         return wrapper(wrapped)
 
