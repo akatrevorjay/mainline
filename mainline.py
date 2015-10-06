@@ -60,14 +60,13 @@ class Di(object):
         factory = lambda: obj
         return self._add_factory(key, factory, scope)
 
-    def has(self, key):
-        return key in self._factories
-
     def has_many(self, *keys):
         for k in keys:
             if not self.has(k):
                 return False
         return True
+
+    has = has_many
 
     def _get_scope(self, scope):
         if callable(scope):
@@ -84,7 +83,7 @@ class Di(object):
     def resolve(self, key):
         f = self._factories[key]
 
-        missing_deps = self.missing_depends_for(key)
+        missing_deps = self.missing_depends(key)
         if missing_deps:
             raise Exception("Unresolvable dependencies: %s" % missing_deps)
 
@@ -104,7 +103,7 @@ class Di(object):
         self._depends_obj[obj].add(key)
         return obj
 
-    def missing_depends_for(self, obj):
+    def missing_depends(self, obj):
         if obj not in self._depends_obj:
             return
         deps = self._depends_obj[obj]
@@ -151,52 +150,9 @@ class Di(object):
         # Return class as this is a decorator
         return klass
 
-    def provide_args(self, keys, func=None):
-        if func is None:
-            return functools.partial(self.provide_args, keys)
-        vals = self.resolve_many(*keys)
-        partial = functools.partial(func, *vals)
-        # partial = functools.update_wrapper(partial, func)
-        partial = functools.wraps(func)(partial)
-        return partial
-
-    def provide_argspec(self, func=None, keys=None):
-        if func is None:
-            return functools.partial(self.provide_argspec)
-
-        if not keys:
-            spec = inspect.getargspec(func)
-            keys = filter(self.has, spec.args)
-
-        kwargs = {k: self.resolve(k) for k in keys}
-        partial = functools.partial(func, **kwargs)
-        return functools.wraps(func)(partial)
-
-    def provide_argspec_lazy_orig(self, func=None, keys=None):
-        if func is None:
-            return functools.partial(self.provide_argspec_lazy_orig, keys=keys)
-
-        spec = inspect.getargspec(func)
-        # keys = ['arg1']
-
-        def wrapped(keys, *args, **kwargs):
-            if not keys:
-                keys = filter(self.has, spec.args)
-
-            injected_kwargs = {k: self.resolve(k) for k in keys}
-            partial = functools.partial(func, **injected_kwargs)
-            # partial = functools.wraps(func)(partial)
-            return partial(*args, **kwargs)
-
-        wrapped = functools.partial(wrapped, keys)
-        # wrapped = functools.wraps(func)(wrapped)
-        return wrapped
-
-    def provide_argspec_lazy(self, wrapped=None, names=None):
-        _LOG.debug('wrapped=%s names=%s', wrapped, names)
-
+    def provide_args(self, wrapped=None, names=None):
         if wrapped is None:
-            return functools.partial(self.provide_argspec_lazy,
+            return functools.partial(self.provide_args,
                                      names=names)
 
         if names:
@@ -213,14 +169,12 @@ class Di(object):
 
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, args, kwargs):
-            _LOG.debug('args=%s kwargs=%s', args, kwargs)
-            # injected_args = self.resolve_deps(wrapped)
-            injected_args = self.resolve_many(*names)
+            injected_args = self.resolve_deps(wrapped)
+            # injected_args = self.resolve_many(*names)
 
             def _execute(*_args, **_kwargs):
                 if _args:
                     injected_args.extend(_args)
-                _LOG.debug('_args=%s _kwargs=%s injected_args=%s', _args, _kwargs, injected_args)
                 return wrapped(*injected_args, **_kwargs)
 
             return _execute(*args, **kwargs)
@@ -229,24 +183,3 @@ class Di(object):
 
 
 di = Di()
-
-
-def omg(arg1, default=True, nil=None, *args, **kwargs):
-    print 'omg', arg1, default, nil, args, kwargs
-
-
-@di.provide_argspec_lazy(names=['arg1'])
-def omg2(arg1, default=True, nil=None, *args, **kwargs):
-    print 'omg', arg1, default, nil, args, kwargs
-
-
-# omg2 = di.provide_argspec_lazy(omg)
-# omg3 = di.provide_argspec_lazy(['arg1'], omg)
-
-di.register_instance('arg1', 'injected_arg1')
-
-# omg10 = di.provide_args(['arg1'], omg)
-#
-# omg11 = di.provide_argspec(omg, keys=['arg1'])
-
-print "reloaded"
