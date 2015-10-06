@@ -146,7 +146,7 @@ class Di(object):
     def provide_args(self, wrapped=None, keys=None):
         if wrapped is None:
             return functools.partial(self.provide_args,
-                                     names=keys)
+                                     keys=keys)
 
         if keys:
             for n in keys:
