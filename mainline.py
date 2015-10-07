@@ -59,13 +59,11 @@ class Di(object):
         factory = lambda: obj
         return self._add_factory(key, factory, scope)
 
-    def has_many(self, *keys):
+    def has(self, *keys):
         for k in keys:
             if not self.has(k):
                 return False
         return True
-
-    has = has_many
 
     def _get_scope(self, scope):
         if callable(scope):
