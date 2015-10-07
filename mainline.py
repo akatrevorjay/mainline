@@ -16,25 +16,11 @@ class Di(object):
     SCOPE_THREAD = lambda self, scopes: self._thread_local.scope[threading.current_thread().ident]
     SCOPE_NONE = lambda self, scopes: None
 
-    Factory = collections.namedtuple('Factory', ['factory', 'scope'])
-
-    events = False
-
     def __init__(self):
         self._factories = {}
         self._scoped_instances = collections.defaultdict(dict)
         self._depends_key = collections.defaultdict(set)
         self._depends_obj = collections.defaultdict(set)
-
-        if self.events:
-            self.on_change = events.Event()
-            self.on_key_change = events.EventManager()
-
-    def _on_change(self, key, factory):
-        if not self.events:
-            return
-        self.on_change(key, factory)
-        self.on_key_change.fire(key, key, factory)
 
     @property
     def _thread_local(self):
@@ -45,9 +31,7 @@ class Di(object):
     def _add_factory(self, key, factory, scope):
         if not callable(factory):
             raise ValueError(factory)
-        f = self.Factory(factory, scope)
-        self._factories[key] = f
-        self._on_change(key, f)
+        self._factories[key] = factory, scope
         return factory
 
     def register(self, key, factory=None, scope=SCOPE_SINGLETON):
@@ -55,7 +39,10 @@ class Di(object):
             return functools.partial(self.register, key, scope=scope)
         return self._add_factory(key, factory, scope)
 
-    def register_instance(self, key, obj, scope=SCOPE_SINGLETON):
+    def register_instance(self, key, obj):
+        # Scope is forced to singleton for instances.
+        # We may want to be able to register an instance to a specific scope at some point.
+        scope = self.SCOPE_SINGLETON
         factory = lambda: obj
         return self._add_factory(key, factory, scope)
 
@@ -77,15 +64,15 @@ class Di(object):
         return {}
 
     def resolve(self, key):
-        f = self._factories[key]
+        factory, factory_scope = self._factories[key]
 
         missing_deps = self.missing_depends(key)
         if missing_deps:
             raise Exception("Unresolvable dependencies: %s" % missing_deps)
 
-        scope = self._get_scope(f.scope)
+        scope = self._get_scope(factory_scope)
         if key not in scope:
-            scope[key] = f.factory()
+            scope[key] = factory()
 
         return scope[key]
 
