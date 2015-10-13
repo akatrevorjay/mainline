@@ -161,5 +161,18 @@ class Di(object):
 
         return wrapper(wrapped)
 
+    def provide_partial(self, wrapped=None, args=None):
+        if wrapped is None:
+            return functools.partial(self.provide_partial,
+                                     args=args)
+
+        if args:
+            map(self.depends_on, args)
+        else:
+            args = self._depends_obj[wrapped]
+
+        injected_args = self.resolve_many(*args)
+        return functools.partial(wrapped, injected_args)
+
 
 di = Di()
