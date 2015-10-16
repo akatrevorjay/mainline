@@ -335,8 +335,6 @@ class Provider(_DiChild):
 
 
 class Di(object):
-    _children = _DiChild.__subclasses__()
-
     def __init__(self):
         self._build()
 
@@ -344,7 +342,8 @@ class Di(object):
         def public_predicate(member):
             return inspect.ismethod(member) and getattr(member, '_di_public', None)
 
-        for cls in self._children:
+        children = _DiChild.__subclasses__()
+        for cls in children:
             inst = cls(self)
             setattr(self, cls.name, inst)
 
