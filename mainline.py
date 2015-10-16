@@ -10,18 +10,6 @@ import inspect
 import wrapt
 import os
 import itertools
-import abc
-
-
-def _mark_public(meth):
-    meth._di_public = True
-    return meth
-
-
-class _DiChild(object):
-    @utils.classproperty
-    def name(cls):
-        return '_%s' % cls.__name__.lower()
 
 
 class Scope(collections.MutableMapping):
@@ -95,9 +83,7 @@ class NamedScope(Scope):
         self.name = name
 
 
-class ScopeRegistry(_DiChild):
-    name = '_scopes'
-
+class ScopeRegistry(object):
     def __init__(self, parent):
         self._lookup = {}
         self._build()
@@ -142,16 +128,8 @@ class ScopeRegistry(_DiChild):
         # Instance means a scope factory created it
         return scope
 
-    @_mark_public
-    def scope(self):
-        return Scope()
 
-    @_mark_public
-    def named_scope(self, name):
-        return NamedScope(name)
-
-
-class Registry(_DiChild):
+class Registry(object):
     def __init__(self, parent):
         self._parent = parent
         self._scopes = parent._scopes
@@ -175,21 +153,8 @@ class Registry(_DiChild):
     def has(self, key):
         return key in self._factories
 
-    @_mark_public
-    def register(self, key, factory=None, scope='singleton'):
-        if factory is None:
-            return functools.partial(self.register, key, scope=scope)
-        self.add(key, factory, scope)
-        return factory
 
-    @_mark_public
-    def register_instance(self, key, obj):
-        return self.add_instance(key, obj)
-
-
-class DependencyRegistry(_DiChild):
-    name = '_depends'
-
+class DependencyRegistry(object):
     def __init__(self, parent):
         self._registry = parent._registry
         self._depends_obj = collections.defaultdict(set)
@@ -209,29 +174,40 @@ class DependencyRegistry(_DiChild):
             return
         return self._depends_obj[obj]
 
-    @_mark_public
+
+class Di(object):
+    def __init__(self):
+        self._scopes = ScopeRegistry(self)
+        self._registry = Registry(self)
+        self._depends = DependencyRegistry(self)
+
+    def scope(self):
+        return Scope()
+
+    def named_scope(self, name):
+        return NamedScope(name)
+
+    def register(self, key, factory=None, scope='singleton'):
+        if factory is None:
+            return functools.partial(self.register, key, scope=scope)
+        self._registry.add(key, factory, scope)
+        return factory
+
+    def register_instance(self, key, obj):
+        return self._registry.add_instance(key, obj)
+
     def depends_on(self, key, obj=None):
         if obj is None:
             return functools.partial(self.depends_on, key)
-        self.add(obj, key)
+        self._depends.add(obj, key)
         return obj
 
-    @_mark_public
     def depends_on_many(self, keys, obj=None):
         if obj is None:
             return functools.partial(self.depends_on, keys)
-        self.add(obj, *keys)
+        self._depends.add(obj, *keys)
         return obj
 
-
-class Resolver(_DiChild):
-    def __init__(self, parent):
-        self._parent = parent
-        self._registry = parent._registry
-        self._scopes = parent._scopes
-        self._depends = parent._depends
-
-    @_mark_public
     def resolve(self, key):
         factory, factory_scope = self._registry.get(key)
 
@@ -246,30 +222,20 @@ class Resolver(_DiChild):
             scope[key] = value = factory()
         return value
 
-    @_mark_public
     def resolve_many(self, *keys):
         return map(self.resolve, keys)
 
-    @_mark_public
     def resolve_deps(self, obj):
         deps = self._depends.get(obj)
         return self.resolve_many(*deps)
 
-
-class Provider(_DiChild):
-    def __init__(self, parent):
-        self._parent = parent
-        self._resolver = parent._resolver
-        self._depends = parent._depends
-
     def _wrap_classproperty(self, cls, key, name, replace_on_access, owner=None):
         # owner is set to the instance if applicable
-        val = self._resolver.resolve(key)
+        val = self.resolve(key)
         if replace_on_access:
             setattr(cls, name, val)
         return val
 
-    @_mark_public
     def provide_classproperty(self, key, klass=None, name=None, replace_on_access=False):
         if klass is None:
             return functools.partial(
@@ -295,7 +261,6 @@ class Provider(_DiChild):
         # Return class as this is a decorator
         return klass
 
-    @_mark_public
     def provide_partial(self, wrapped=None, args=None):
         if wrapped is None:
             return functools.partial(self.provide_partial, args=args)
@@ -305,10 +270,9 @@ class Provider(_DiChild):
         else:
             args = self._depends.get(wrapped)
 
-        injected_args = self._resolver.resolve_many(*args)
+        injected_args = self.resolve_many(*args)
         return functools.partial(wrapped, *injected_args)
 
-    @_mark_public
     def provide_args(self, wrapped=None, args=None):
         if wrapped is None:
             return functools.partial(self.provide_args, args=args)
@@ -328,7 +292,7 @@ class Provider(_DiChild):
 
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, wargs, wkwargs):
-            injected_args = self._resolver.resolve_many(*args)
+            injected_args = self.resolve_many(*args)
 
             def _execute(*_wargs, **_wkwargs):
                 if _wargs:
@@ -338,23 +302,6 @@ class Provider(_DiChild):
             return _execute(*wargs, **wkwargs)
 
         return wrapper(wrapped)
-
-
-class Di(object):
-    def __init__(self):
-        self._build()
-
-    def _build(self):
-        def public_predicate(member):
-            return inspect.ismethod(member) and getattr(member, '_di_public', None)
-
-        children = _DiChild.__subclasses__()
-        for cls in children:
-            inst = cls(self)
-            setattr(self, cls.name, inst)
-
-            for name, meth in inspect.getmembers(inst, public_predicate):
-                setattr(self, name, meth)
 
 
 di = Di()
