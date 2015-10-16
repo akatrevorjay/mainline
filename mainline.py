@@ -25,7 +25,7 @@ class _DiChild(object):
 
 
 class Scope(collections.MutableMapping):
-    __metaclass__ = abc.ABCMeta
+    register = True
 
     @utils.classproperty
     def name(cls):
@@ -73,8 +73,6 @@ class ProcessScope(Scope):
 
 
 class ThreadScope(Scope):
-    name = 'thread'
-
     def __init__(self, *args, **kwargs):
         self._thread_local = threading.local()
         super(ThreadScope, self).__init__(*args, **kwargs)
@@ -90,7 +88,9 @@ class NoneScope(Scope):
         return
 
 
-class NamedScope(SingletonScope):
+class NamedScope(Scope):
+    register = False
+
     def __init__(self, name):
         self.name = name
 
@@ -99,12 +99,12 @@ class ScopeRegistry(_DiChild):
     name = '_scopes'
 
     def __init__(self, parent):
-        self._instances = {}
         self._lookup = {}
         self._build()
 
     def _build(self):
         scope_classes = Scope.__subclasses__()
+        scope_classes = [s for s in scope_classes if s.register]
         map(self.add, scope_classes)
 
     _scope_type = collections.MutableMapping
@@ -141,6 +141,10 @@ class ScopeRegistry(_DiChild):
 
         # Instance means a scope factory created it
         return scope
+
+    @_mark_public
+    def scope(self):
+        return Scope()
 
     @_mark_public
     def named_scope(self, name):
@@ -236,9 +240,11 @@ class Resolver(_DiChild):
             raise Exception("Unresolvable dependencies: %s" % missing)
 
         scope = self._scopes.get(factory_scope)
-        if key not in scope:
-            scope[key] = factory()
-        return scope[key]
+        if key in scope:
+            value = scope[key]
+        else:
+            scope[key] = value = factory()
+        return value
 
     @_mark_public
     def resolve_many(self, *keys):
@@ -352,3 +358,4 @@ class Di(object):
 
 
 di = Di()
+di.register_instance('di', di)
