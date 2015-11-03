@@ -2,7 +2,6 @@ from vkproxy.log import get_logger
 
 _LOG = get_logger()
 
-from vkproxy import utils
 import threading
 import functools
 import collections
@@ -10,12 +9,32 @@ import inspect
 import wrapt
 import os
 import itertools
+import six
+
+
+class classproperty(object):
+    def __init__(self, f):
+        self.f = f
+
+    def __get__(self, obj, owner):
+        return self.f(owner)
+
+
+def consume(iterator, n=None):
+    "Advance the iterator n-steps ahead. If n is none, consume entirely."
+    # Use functions that consume iterators at C speed.
+    if n is None:
+        # feed the entire iterator into a zero-length deque
+        collections.deque(iterator, maxlen=0)
+    else:
+        # advance to the empty slice starting at position n
+        next(itertools.islice(iterator, n, n), None)
 
 
 class Scope(collections.MutableMapping):
     register = True
 
-    @utils.classproperty
+    @classproperty
     def name(cls):
         remove_end = 'Scope'
         name = cls.__name__
@@ -91,7 +110,7 @@ class ScopeRegistry(object):
     def _build(self):
         scope_classes = Scope.__subclasses__()
         scope_classes = [s for s in scope_classes if s.register]
-        map(self.add, scope_classes)
+        consume(map(self.add, scope_classes))
 
     _scope_type = collections.MutableMapping
 
@@ -223,7 +242,7 @@ class Di(object):
         return value
 
     def resolve_many(self, *keys):
-        return map(self.resolve, keys)
+        return list(map(self.resolve, keys))
 
     def resolve_deps(self, obj):
         deps = self._depends.get(obj)
@@ -253,7 +272,7 @@ class Di(object):
         # Add in arguments
         partial = functools.partial(self._wrap_classproperty, klass, key, name, replace_on_access)
         # Create classproperty from it
-        clsprop = utils.classproperty(partial)
+        clsprop = classproperty(partial)
 
         # Attach descriptor to object
         setattr(klass, name, clsprop)
