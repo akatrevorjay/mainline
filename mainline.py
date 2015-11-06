@@ -194,6 +194,14 @@ class DependencyRegistry(object):
         return self._depends_obj[obj]
 
 
+class DiError(Exception):
+    pass
+
+
+class UnresolvableError(DiError):
+    pass
+
+
 class Di(object):
     def __init__(self):
         self._scopes = ScopeRegistry(self)
@@ -215,38 +223,65 @@ class Di(object):
     def register_instance(self, key, obj):
         return self._registry.add_instance(key, obj)
 
-    def depends_on(self, key, obj=None):
-        if obj is None:
-            return functools.partial(self.depends_on, key)
-        self._depends.add(obj, key)
-        return obj
+    def _coerce_key_or_keys(self, key_or_keys, *more_keys):
+        keys = []
 
-    def depends_on_many(self, keys, obj=None):
+        if more_keys:
+            # Multiple arguments given
+            keys.append(key_or_keys)
+            keys.extend(more_keys)
+        elif isinstance(key_or_keys, six.string_types):
+            # Singular str
+            keys.append(key_or_keys)
+        else:
+            # Singular item; treat as an iterable
+            keys.extend(key_or_keys)
+
+        return keys
+
+    def depends_on(self, key_or_keys, obj=None):
         if obj is None:
-            return functools.partial(self.depends_on, keys)
+            return functools.partial(self.depends_on, keys_or_keys)
+        keys = self._coerce_key_or_keys(key_or_keys)
         self._depends.add(obj, *keys)
         return obj
 
-    def resolve(self, key):
+    def get_deps(self, obj):
+        return self._depends.get(obj)
+
+    def _resolve_one(self, key):
         factory, factory_scope = self._registry.get(key)
 
         missing = self._depends.missing(key)
         if missing:
-            raise Exception("Unresolvable dependencies: %s" % missing)
+            raise UnresolvableError("Missing dependencies for %s: %s" % (key, missing))
 
         scope = self._scopes.get(factory_scope)
         if key in scope:
             value = scope[key]
         else:
             scope[key] = value = factory()
+
         return value
 
-    def resolve_many(self, *keys):
-        return list(map(self.resolve, keys))
+    def resolve(self, key_or_keys, *more_keys, **kwargs):
+        # only py3k can have default args with *args
+        with_keys = kwargs.get('with_keys', False)
+        keys = self._coerce_key_or_keys(key_or_keys, *more_keys)
 
-    def resolve_deps(self, obj):
-        deps = self._depends.get(obj)
-        return self.resolve_many(*deps)
+        ret = list(map(self._resolve_one, keys))
+        if with_keys:
+            ret = zip(keys, ret)
+
+        if more_keys:
+            # Always return a sequence when given multiple arguments
+            return ret
+        else:
+            return ret[0]
+
+    def resolve_deps(self, obj, **kwargs):
+        deps = self.get_deps(obj)
+        return self.resolve(deps, **kwargs)
 
     def _wrap_classproperty(self, cls, key, name, replace_on_access, owner=None):
         # owner is set to the instance if applicable
@@ -289,7 +324,7 @@ class Di(object):
         else:
             args = self._depends.get(wrapped)
 
-        injected_args = self.resolve_many(*args)
+        injected_args = self.resolve(*args)
         return functools.partial(wrapped, *injected_args)
 
     def provide_args(self, wrapped=None, args=None):
@@ -307,11 +342,10 @@ class Di(object):
 
         # Update argspec
         spec = inspect.ArgSpec(sargs, *spec[1:])
-        # spec.__dict__['args'] = sargs
 
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, wargs, wkwargs):
-            injected_args = self.resolve_many(*args)
+            injected_args = self.resolve(*args)
 
             def _execute(*_wargs, **_wkwargs):
                 if _wargs:
