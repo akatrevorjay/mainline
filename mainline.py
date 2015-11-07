@@ -10,6 +10,7 @@ import wrapt
 import os
 import itertools
 import six
+import weakref
 
 
 class classproperty(object):
@@ -32,20 +33,13 @@ def consume(iterator, n=None):
 
 
 class Scope(collections.MutableMapping):
-    register = True
-
-    @classproperty
-    def name(cls):
-        remove_end = 'Scope'
-        name = cls.__name__
-        if name.endswith(remove_end):
-            name = name.rsplit(remove_end, 1)[0]
-        return name.lower()
-
+    register_as = None
+    instances = None
     instances_factory = dict
 
     def __init__(self, *args, **kwargs):
-        self.instances = self.instances_factory()
+        if self.instances is None:
+            self.instances = self.instances_factory()
         self.update(dict(*args, **kwargs))
 
     def __key_transform__(self, key):
@@ -71,15 +65,19 @@ class Scope(collections.MutableMapping):
 
 
 class SingletonScope(Scope):
-    pass
+    register_as = 'singleton'
 
 
 class ProcessScope(Scope):
+    register_as = 'process'
+
     def __key_transform__(self, key):
         return '%s_%s' % (os.getpid(), key)
 
 
 class ThreadScope(Scope):
+    register_as = 'thread'
+
     def __init__(self, *args, **kwargs):
         self._thread_local = threading.local()
         super(ThreadScope, self).__init__(*args, **kwargs)
@@ -91,96 +89,160 @@ class ThreadScope(Scope):
 
 
 class NoneScope(Scope):
+    register_as = 'none'
+
     def __setitem__(self, key, value):
         return
 
 
 class NamedScope(Scope):
-    register = False
-
     def __init__(self, name):
         self.name = name
 
 
+class ProxyScope(Scope):
+    def __init__(self, scope, *args, **kwargs):
+        self.instances = scope
+        super(ProxyScope, self).__init__(*args, **kwargs)
+
+
+class NamespacedChildScope(ProxyScope):
+    def __init__(self, name, *args, **kwargs):
+        self.namespace = name
+        super(NamespacedChildScope, self).__init__(*args, **kwargs)
+
+    @property
+    def name(self):
+        return self.namespace
+
+    def __key_transform__(self, key):
+        return '%s.%s' % (self.namespace, key)
+
+
 class ScopeRegistry(object):
     def __init__(self, parent):
-        self._lookup = {}
+        self._map = {}
         self._build()
 
     def _build(self):
-        scope_classes = Scope.__subclasses__()
-        scope_classes = [s for s in scope_classes if s.register]
-        consume(map(self.add, scope_classes))
+        classes = Scope.__subclasses__()
+        cls_map = {s.register_as: s for s in classes if s.register_as}
+        for name, cls in six.iteritems(cls_map):
+            self.register(name, cls)
 
-    _scope_type = collections.MutableMapping
-
-    def is_scope(self, obj):
-        return isinstance(obj, self._scope_type) or issubclass(obj, self._scope_type)
-
-    def add(self, obj, name=None):
-        if not self.is_scope(obj):
-            raise ValueError("Scope %s does not supply %s interface" % (obj, self._scope_type))
-        if name is None:
-            name = getattr(obj, 'name')
-        self._lookup[name] = obj
+    def register(self, name, scope_or_scope_factory):
+        if callable(scope_or_scope_factory):
+            instance = scope_or_scope_factory()
+            # Save lookup from factory to instance
+            self._map[scope_or_scope_factory] = instance
+        else:
+            instance = scope_or_scope_factory
+        self._map[name] = instance
 
     def resolve(self, scope):
-        # Lookup names
-        if scope in self._lookup:
-            scope = self._lookup[scope]
-
-        if self.is_scope(scope):
-            return scope
-
-        raise KeyError("Scope %s does not exist" % scope)
+        if scope not in self._map:
+            raise KeyError("Scope %s does not exist" % scope)
+        scope = self._map[scope]
+        return scope
 
     def get(self, scope):
-        scope = self.resolve(scope)
+        return self.resolve(scope)
 
-        # Class means we maintain a single instance
-        if inspect.isclass(scope):
-            # We initialize them here (in get) to create them lazily
-            if scope not in self._lookup:
-                self._lookup[scope] = scope()
-            scope = self.resolve(scope)
 
-        # Instance means a scope factory created it
-        return scope
+class Provider(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self.provide(*args, **kwargs)
+
+    def provide(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+class FactoryProvider(Provider):
+    def __init__(self, factory):
+        self.factory = factory
+
+    def provide(self, *args, **kwargs):
+        return self.factory(*args, **kwargs)
+
+
+class ScopeProvider(FactoryProvider):
+    def __init__(self, scope, key, factory):
+        self.key = key
+        self.scope = scope
+        super(ScopeProvider, self).__init__(factory)
+
+    def __call__(self, *args, **kwargs):
+        if self.key in self.scope:
+            return self.scope[self.key]
+        instance = super(ScopeProvider, self).__call__(*args, **kwargs)
+        self.set_instance(instance)
+        return instance
+
+    def set_instance(self, instance):
+        self.scope[self.key] = instance
+
+
+class SingletonProvider(FactoryProvider):
+    def __call__(self, *args, **kwargs):
+        if not hasattr(self, 'instance'):
+            self.instance = super(SingletonProvider, self).__call__(*args, **kwargs)
+        return self.instance
 
 
 class Registry(object):
     def __init__(self, parent):
         self._parent = parent
-        self._scopes = parent._scopes
 
-        self._factories = {}
-
-    def add(self, key, factory, scope):
-        scope = self._scopes.resolve(scope)
-        self._factories[key] = factory, scope
-
-    def add_instance(self, key, obj):
-        # Scope is forced to singleton for instances.
-        # We may want to be able to register an instance to a specific scope at some point.
-        scope = 'singleton'
-        factory = lambda: obj
-        return self.add(key, factory, scope)
-
-    def get(self, key):
-        return self._factories[key]
+        self._map = {}
 
     def has(self, key):
-        return key in self._factories
+        return key in self._map
+
+    __contains__ = has
+
+    _sentinel = object()
+
+    def get(self, key, default=None):
+        value = self._map.get(key, default)
+        if value is self._sentinel:
+            raise KeyError(key)
+        return value
+
+    def __getitem__(self, key):
+        return self.get(key, default=self._sentinel)
+
+    def add(self, key, scope, factory):
+        if key in self:
+            raise KeyError("Key %s already exists" % key)
+        provider = ScopeProvider(scope, key, factory)
+        self._map[key] = provider
+        return provider
+
+    def remove(self, key):
+        del self._map[key]
+
+    __delitem__ = remove
+
+    def discard(self, key):
+        if self.has(key):
+            self.remove(key)
 
 
 class DependencyRegistry(object):
     def __init__(self, parent):
         self._registry = parent._registry
-        self._depends_obj = collections.defaultdict(set)
+
+        self._map = collections.defaultdict(set)
 
     def add(self, obj, *keys):
+        # if obj not in self._lookup:
+        #     self._lookup[obj] = set()
+
         for k in keys:
-            self._depends_obj[obj].add(k)
+            self._map[obj].add(k)
 
     def missing(self, obj):
         deps = self.get(obj)
@@ -188,10 +250,10 @@ class DependencyRegistry(object):
             return
         return itertools.ifilterfalse(self._registry.has, deps)
 
-    def get(self, obj):
-        if obj not in self._depends_obj:
-            return
-        return self._depends_obj[obj]
+    def get(self, obj, default=None):
+        # if obj not in self._lookup:
+        #     return
+        return self._map.get(obj, default)
 
 
 class DiError(Exception):
@@ -208,20 +270,24 @@ class Di(object):
         self._registry = Registry(self)
         self._depends = DependencyRegistry(self)
 
-    def scope(self):
-        return Scope()
+    # Scope = Scope
+    NamedScope = NamedScope
 
-    def named_scope(self, name):
-        return NamedScope(name)
+    _sentinel = object()
 
-    def register(self, key, factory=None, scope='singleton'):
-        if factory is None:
-            return functools.partial(self.register, key, scope=scope)
-        self._registry.add(key, factory, scope)
+    def register_factory(self, key, factory=_sentinel, scope='singleton'):
+        if factory is self._sentinel:
+            return functools.partial(self.register_factory, key, scope=scope)
+        scope = self._scopes.get(scope)
+        self._registry.add(key, scope, factory)
         return factory
 
-    def register_instance(self, key, obj):
-        return self._registry.add_instance(key, obj)
+    def register_instance(self, key, instance, default_scope='singleton'):
+        if not self._registry.has(key):
+            # We don't know how to create this kind of instance at this time, so add it without a factory.
+            factory = None
+            self.register_factory(key, factory, default_scope)
+        self._registry[key].set_instance(instance)
 
     def _coerce_key_or_keys(self, key_or_keys, *more_keys):
         keys = []
@@ -250,30 +316,21 @@ class Di(object):
         return self._depends.get(obj)
 
     def _resolve_one(self, key):
-        factory, factory_scope = self._registry.get(key)
+        provider = self._registry[key]
 
+        # TODO Check the scopes for missing keys, not the registry
         missing = self._depends.missing(key)
         if missing:
             raise UnresolvableError("Missing dependencies for %s: %s" % (key, missing))
 
-        scope = self._scopes.get(factory_scope)
-        if key in scope:
-            value = scope[key]
-        else:
-            scope[key] = value = factory()
+        return provider()
 
-        return value
-
-    def resolve(self, key_or_keys, *more_keys, **kwargs):
+    def resolve(self, key_or_keys, *more_keys):
         # only py3k can have default args with *args
-        with_keys = kwargs.get('with_keys', False)
         keys = self._coerce_key_or_keys(key_or_keys, *more_keys)
-
         ret = list(map(self._resolve_one, keys))
-        if with_keys:
-            ret = zip(keys, ret)
 
-        if more_keys:
+        if not isinstance(key_or_keys, six.string_types) or more_keys:
             # Always return a sequence when given multiple arguments
             return ret
         else:
@@ -324,7 +381,7 @@ class Di(object):
         else:
             args = self._depends.get(wrapped)
 
-        injected_args = self.resolve(*args)
+        injected_args = self.resolve(args)
         return functools.partial(wrapped, *injected_args)
 
     def provide_args(self, wrapped=None, args=None):
@@ -345,7 +402,7 @@ class Di(object):
 
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, wargs, wkwargs):
-            injected_args = self.resolve(*args)
+            injected_args = self.resolve(args)
 
             def _execute(*_wargs, **_wkwargs):
                 if _wargs:
