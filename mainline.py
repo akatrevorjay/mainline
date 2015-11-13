@@ -11,6 +11,13 @@ import os
 import itertools
 import six
 import weakref
+import sys
+
+IS_PYPY = '__pypy__' in sys.builtin_module_names
+if IS_PYPY or six.PY3:  # pragma: no cover
+    OBJECT_INIT = six.get_unbound_function(object.__init__)
+else:  # pragma: no cover
+    OBJECT_INIT = None
 
 
 class classproperty(object):
@@ -21,19 +28,100 @@ class classproperty(object):
         return self.f(owner)
 
 
-def consume(iterator, n=None):
-    "Advance the iterator n-steps ahead. If n is none, consume entirely."
-    # Use functions that consume iterators at C speed.
-    if n is None:
-        # feed the entire iterator into a zero-length deque
-        collections.deque(iterator, maxlen=0)
-    else:
-        # advance to the empty slice starting at position n
-        next(itertools.islice(iterator, n, n), None)
+class DiError(Exception):
+    pass
+
+
+class UnresolvableError(DiError):
+    pass
+
+
+class Provider(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self.provide(*args, **kwargs)
+
+    def provide(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def set_instance(self, instance):
+        raise NotImplementedError
+
+
+class FactoryProvider(Provider):
+    def __init__(self, factory):
+        self.factory = factory
+
+    def provide(self, *args, **kwargs):
+        return self.factory(*args, **kwargs)
+
+
+class SingletonProvider(FactoryProvider):
+    name = 'singleton'
+
+    def provide(self, *args, **kwargs):
+        if not hasattr(self, 'instance'):
+            instance = super(SingletonProvider, self).provide(*args, **kwargs)
+            self.set_instance(instance)
+        return self.instance
+
+    def reset(self):
+        if hasattr(self, 'instance'):
+            delattr(self, 'instance')
+
+    def set_instance(self, instance):
+        self.instance = instance
+
+
+class ScopeProvider(FactoryProvider):
+    def __init__(self, scope, factory, key=''):
+        self.key = key
+        self.scope = scope
+        super(ScopeProvider, self).__init__(factory)
+
+    def __repr__(self):
+        return '<%s scope=%s>' % (self.__class__.__name__, self.scope)
+
+    def provide(self, *args, **kwargs):
+        if self.key in self.scope:
+            return self.scope[self.key]
+        instance = super(ScopeProvider, self).provide(*args, **kwargs)
+        self.set_instance(instance)
+        return instance
+
+    def set_instance(self, instance):
+        self.scope[self.key] = instance
+
+
+class ProviderRegistry(dict):
+    has = dict.__contains__
+
+
+class DependencyRegistry(object):
+    def __init__(self, registry):
+        self._registry = registry
+        self._map = collections.defaultdict(set)
+
+    def add(self, obj, *keys):
+        for k in keys:
+            self._map[obj].add(k)
+
+    def missing(self, obj):
+        deps = self.get(obj)
+        if not deps:
+            return
+        return itertools.ifilterfalse(self._registry.has, deps)
+
+    def get(self, obj, default=None):
+        return self._map.get(obj, default)
 
 
 class Scope(collections.MutableMapping):
-    register_as = None
+    register = False
+    name = None
+
     instances = None
     instances_factory = dict
 
@@ -45,16 +133,25 @@ class Scope(collections.MutableMapping):
     def __key_transform__(self, key):
         return key
 
+    class _key(str):
+        pass
+
+    def _key_factory(self, key):
+        if not isinstance(key, self._key):
+            key = self.__key_transform__(key)
+            key = self._key(key)
+        return key
+
     def __getitem__(self, key):
-        key = self.__key_transform__(key)
+        key = self._key_factory(key)
         return self.instances[key]
 
     def __setitem__(self, key, value):
-        key = self.__key_transform__(key)
+        key = self._key_factory(key)
         self.instances[key] = value
 
     def __delitem__(self, key):
-        key = self.__key_transform__(key)
+        key = self._key_factory(key)
         del self.instances[key]
 
     def __iter__(self):
@@ -63,20 +160,26 @@ class Scope(collections.MutableMapping):
     def __len__(self):
         return len(self.instances)
 
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, dict(self))
+
 
 class SingletonScope(Scope):
-    register_as = 'singleton'
+    register = True
+    name = 'singleton'
 
 
 class ProcessScope(Scope):
-    register_as = 'process'
+    register = True
+    name = 'process'
 
     def __key_transform__(self, key):
         return '%s_%s' % (os.getpid(), key)
 
 
 class ThreadScope(Scope):
-    register_as = 'thread'
+    register = True
+    name = 'thread'
 
     def __init__(self, *args, **kwargs):
         self._thread_local = threading.local()
@@ -89,7 +192,8 @@ class ThreadScope(Scope):
 
 
 class NoneScope(Scope):
-    register_as = 'none'
+    register = True
+    name = 'none'
 
     def __setitem__(self, key, value):
         return
@@ -116,207 +220,134 @@ class NamespacedChildScope(ProxyScope):
         return self.namespace
 
     def __key_transform__(self, key):
-        return '%s.%s' % (self.namespace, key)
+        return '%s__%s' % (self.namespace, key)
 
 
 class ScopeRegistry(object):
-    def __init__(self, parent):
-        self._map = {}
+    def __init__(self):
+        self._factories = {}
         self._build()
 
     def _build(self):
         classes = Scope.__subclasses__()
-        cls_map = {s.register_as: s for s in classes if s.register_as}
-        for name, cls in six.iteritems(cls_map):
-            self.register(name, cls)
+        classes = filter(lambda x: x.register, classes)
+        list(map(self.register_factory, classes))
 
-    def register(self, name, scope_or_scope_factory):
-        if callable(scope_or_scope_factory):
-            instance = scope_or_scope_factory()
-            # Save lookup from factory to instance
-            self._map[scope_or_scope_factory] = instance
+    def register_factory(self, factory, name=None):
+        if name is None:
+            name = getattr(factory, 'name', None)
+
+        if name:
+            self._factories[name] = factory
+        self._factories[factory] = factory
+
+    def resolve(self, scope_or_scope_factory):
+        if self.is_scope_instance(scope_or_scope_factory):
+            scope = scope_or_scope_factory
+            return scope
+        elif self.is_scope_factory(scope_or_scope_factory):
+            factory = scope_or_scope_factory
+            return factory()
+        elif scope_or_scope_factory in self._factories:
+            factory = self._factories[scope_or_scope_factory]
+            return self.resolve(factory)
         else:
-            instance = scope_or_scope_factory
-        self._map[name] = instance
+            raise KeyError("Scope %s is not known" % scope)
 
-    def resolve(self, scope):
-        if scope not in self._map:
-            raise KeyError("Scope %s does not exist" % scope)
-        scope = self._map[scope]
-        return scope
+    _scope_type = Scope
 
-    def get(self, scope):
-        return self.resolve(scope)
+    @classmethod
+    def is_scope_factory(cls, obj):
+        return callable(obj) and issubclass(obj, cls._scope_type)
 
+    @classmethod
+    def is_scope_instance(cls, obj):
+        return isinstance(obj, cls._scope_type)
 
-class Provider(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return self.provide(*args, **kwargs)
-
-    def provide(self, *args, **kwargs):
-        raise NotImplementedError
+    @classmethod
+    def is_scope(cls, obj):
+        return cls.is_scope_factory(obj) or cls.is_scope_instance(obj)
 
 
-class FactoryProvider(Provider):
-    def __init__(self, factory):
-        self.factory = factory
-
-    def provide(self, *args, **kwargs):
-        return self.factory(*args, **kwargs)
-
-
-class ScopeProvider(FactoryProvider):
-    def __init__(self, scope, key, factory):
-        self.key = key
-        self.scope = scope
-        super(ScopeProvider, self).__init__(factory)
-
-    def __call__(self, *args, **kwargs):
-        if self.key in self.scope:
-            return self.scope[self.key]
-        instance = super(ScopeProvider, self).__call__(*args, **kwargs)
-        self.set_instance(instance)
-        return instance
-
-    def set_instance(self, instance):
-        self.scope[self.key] = instance
-
-
-class SingletonProvider(FactoryProvider):
-    def __call__(self, *args, **kwargs):
-        if not hasattr(self, 'instance'):
-            self.instance = super(SingletonProvider, self).__call__(*args, **kwargs)
-        return self.instance
-
-
-class Registry(object):
-    def __init__(self, parent):
-        self._parent = parent
-
-        self._map = {}
-
-    def has(self, key):
-        return key in self._map
-
-    __contains__ = has
-
-    _sentinel = object()
-
-    def get(self, key, default=None):
-        value = self._map.get(key, default)
-        if value is self._sentinel:
-            raise KeyError(key)
-        return value
-
-    def __getitem__(self, key):
-        return self.get(key, default=self._sentinel)
-
-    def add(self, key, scope, factory):
-        if key in self:
-            raise KeyError("Key %s already exists" % key)
-        provider = ScopeProvider(scope, key, factory)
-        self._map[key] = provider
-        return provider
-
-    def remove(self, key):
-        del self._map[key]
-
-    __delitem__ = remove
-
-    def discard(self, key):
-        if self.has(key):
-            self.remove(key)
-
-
-class DependencyRegistry(object):
-    def __init__(self, parent):
-        self._registry = parent._registry
-
-        self._map = collections.defaultdict(set)
-
-    def add(self, obj, *keys):
-        # if obj not in self._lookup:
-        #     self._lookup[obj] = set()
-
-        for k in keys:
-            self._map[obj].add(k)
-
-    def missing(self, obj):
-        deps = self.get(obj)
-        if not deps:
-            return
-        return itertools.ifilterfalse(self._registry.has, deps)
-
-    def get(self, obj, default=None):
-        # if obj not in self._lookup:
-        #     return
-        return self._map.get(obj, default)
-
-
-class DiError(Exception):
-    pass
-
-
-class UnresolvableError(DiError):
-    pass
-
-
-class Di(object):
-    def __init__(self):
-        self._scopes = ScopeRegistry(self)
-        self._registry = Registry(self)
-        self._depends = DependencyRegistry(self)
-
+class Di(collections.MutableMapping):
     # Scope = Scope
     NamedScope = NamedScope
 
     _sentinel = object()
 
+    def __init__(self):
+        self._providers = ProviderRegistry()
+        self._depends = DependencyRegistry(self._providers)
+        self._scopes = ScopeRegistry()
+
+    ''' MutableMapping interface '''
+
+    def __contains__(self, item):
+        return item in self._providers
+
+    def __getitem__(self, item):
+        return self._providers[item]
+
+    def __setitem__(self, key, value):
+        self._providers[key] = value
+
+    def __delitem__(self, key):
+        del self._providers[key]
+
+    def __iter__(self):
+        return iter(self._providers)
+
+    def __len__(self):
+        return len(self._providers)
+
+    ''' API '''
+
     def register_factory(self, key, factory=_sentinel, scope='singleton'):
         if factory is self._sentinel:
             return functools.partial(self.register_factory, key, scope=scope)
-        scope = self._scopes.get(scope)
-        self._registry.add(key, scope, factory)
+        if key in self._providers:
+            raise KeyError("Key %s already exists" % key)
+        scope = self._scopes.resolve(scope)
+        self._providers[key] = ScopeProvider(scope, factory)
         return factory
 
-    def register_instance(self, key, instance, default_scope='singleton'):
-        if not self._registry.has(key):
+    def add_instance(self, key, instance, default_scope='singleton'):
+        if key not in self._providers:
             # We don't know how to create this kind of instance at this time, so add it without a factory.
             factory = None
             self.register_factory(key, factory, default_scope)
-        self._registry[key].set_instance(instance)
+        self._providers[key].set_instance(instance)
 
     def _coerce_key_or_keys(self, key_or_keys, *more_keys):
         keys = []
+        return_list = True
 
         if more_keys:
             # Multiple arguments given
             keys.append(key_or_keys)
             keys.extend(more_keys)
-        elif isinstance(key_or_keys, six.string_types):
-            # Singular str
-            keys.append(key_or_keys)
-        else:
+        elif isinstance(key_or_keys, list):
             # Singular item; treat as an iterable
             keys.extend(key_or_keys)
+        else:
+            # Singular str
+            keys.append(key_or_keys)
+            return_list = False
 
-        return keys
+        return keys, return_list
 
-    def depends_on(self, key_or_keys, obj=None):
-        if obj is None:
-            return functools.partial(self.depends_on, keys_or_keys)
-        keys = self._coerce_key_or_keys(key_or_keys)
-        self._depends.add(obj, *keys)
-        return obj
+    def depends_on(self, *keys):
+        def decorator(method):
+            self._depends.add(method, *keys)
+            return method
+
+        return decorator
 
     def get_deps(self, obj):
         return self._depends.get(obj)
 
     def _resolve_one(self, key):
-        provider = self._registry[key]
+        provider = self._providers[key]
 
         # TODO Check the scopes for missing keys, not the registry
         missing = self._depends.missing(key)
@@ -327,10 +358,10 @@ class Di(object):
 
     def resolve(self, key_or_keys, *more_keys):
         # only py3k can have default args with *args
-        keys = self._coerce_key_or_keys(key_or_keys, *more_keys)
+        keys, return_list = self._coerce_key_or_keys(key_or_keys, *more_keys)
         ret = list(map(self._resolve_one, keys))
 
-        if not isinstance(key_or_keys, six.string_types) or more_keys:
+        if return_list:
             # Always return a sequence when given multiple arguments
             return ret
         else:
@@ -347,10 +378,10 @@ class Di(object):
             setattr(cls, name, val)
         return val
 
-    def provide_classproperty(self, key, klass=None, name=None, replace_on_access=False):
+    def inject_classproperty(self, key, klass=None, name=None, replace_on_access=False):
         if klass is None:
             return functools.partial(
-                self.provide_classproperty,
+                self.inject_classproperty,
                 key, name=name,
                 replace_on_access=replace_on_access,
             )
@@ -371,18 +402,6 @@ class Di(object):
 
         # Return class as this is a decorator
         return klass
-
-    def provide_partial(self, wrapped=None, args=None):
-        if wrapped is None:
-            return functools.partial(self.provide_partial, args=args)
-
-        if args:
-            self._depends.add(wrapped, *args)
-        else:
-            args = self._depends.get(wrapped)
-
-        injected_args = self.resolve(args)
-        return functools.partial(wrapped, *injected_args)
 
     def provide_args(self, wrapped=None, args=None):
         if wrapped is None:
@@ -415,4 +434,4 @@ class Di(object):
 
 
 di = Di()
-di.register_instance('di', di)
+di.add_instance('di', di)
