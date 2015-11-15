@@ -293,6 +293,39 @@ class ScopeRegistry(ProxyMutableMapping):
         return cls.is_scope_factory(obj) or cls.is_scope_instance(obj)
 
 
+class DiCatalogMeta(type):
+    def __new__(mcs, class_name, bases, attributes):
+        # providers = {}
+        #
+        # for base in bases:
+        #     if not isinstance(base, DiCatalog):
+        #         continue
+        #     providers.update(base.providers)
+        #
+        # providers.update({k: v for k, v in six.iteritems(attributes)
+        #                   if isinstance(v, Provider)})
+
+        cls = type.__new__(mcs, class_name, bases, attributes)
+
+        providers = {k: v for k, v in six.iteritems(attributes)
+                     if isinstance(v, Provider)}
+        cls.providers = providers
+
+        cls.attrs = attributes
+        cls.bases = bases
+        cls.name = class_name
+
+        return cls
+
+
+@six.add_metaclass(DiCatalogMeta)
+class DiCatalog(object):
+    di = None
+
+    def __init__(self, di):
+        pass
+
+
 class Di(ProxyMutableMapping):
     # Scope = Scope
     NamedScope = NamedScope
@@ -304,6 +337,11 @@ class Di(ProxyMutableMapping):
         super(Di, self).__init__(self._providers)
         self._depends = DependencyRegistry(self._providers)
         self._scopes = ScopeRegistry()
+
+        self.Catalog.di = self
+
+    class Catalog(DiCatalog):
+        pass
 
     ''' API '''
 
@@ -411,6 +449,107 @@ class Di(ProxyMutableMapping):
     def inject(self, *args, **kwargs):
         return Injector(self, *args, **kwargs)
 
+    def auto_inject(self, *args, **kwargs):
+        return AutoInjector(self, *args, **kwargs)
+
+
+class Injection(object):
+    def __init__(self, injectable):
+        self.injectable = injectable
+
+    def __call__(self):
+        raise NotImplementedError
+
+
+class ArgInjection(Injection):
+    pass
+
+
+class NamedInjection(Injection):
+    def __init__(self, name, injectable):
+        self.name = name
+        super(Injection, self).__init__(injectable)
+
+
+class KwargInjection(NamedInjection):
+    pass
+
+
+class ClassPropertyInjection(NamedInjection):
+    pass
+
+
+class ArgProvider(Provider):
+    def __init__(self, value):
+        self.value = value
+
+    def provide(self, *args, **kwargs):
+        return self.value
+
+
+class AutoInjector(object):
+    def __init__(self, di, *args, **kwargs):
+        self.di = di
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, wrapped):
+        if not any([self.args, self.kwargs]):
+            deps = self.di._depends.get(wrapped)
+            if not deps:
+                deps = self.di.keys()
+        else:
+            deps = []
+            if self.args:
+                deps.extend(self.args)
+            if self.kwargs:
+                deps.extend(self.kwargs.values())
+            self.di._depends.add(wrapped, *deps)
+
+        # Remove the number of args from the wrapped function's argspec
+        spec = inspect.getargspec(wrapped)
+
+        class Arg(object):
+            def __init__(self, key):
+                self.key = key
+
+        all_args = []
+        new_args = []
+        for index, arg in enumerate(spec.args):
+            if arg in self.kwargs and self.kwargs[arg] in deps:
+                arg = Arg(self.kwargs.pop(arg))
+            elif arg in deps:
+                arg = Arg(arg)
+            else:
+                new_args.append(arg)
+            all_args.append(arg)
+
+        # Update argspec
+        spec = inspect.ArgSpec(new_args, *spec[1:])
+
+        @wrapt.decorator(adapter=spec)
+        def wrapper(wrapped, instance, args, kwargs):
+            args_cur_index = 0
+            injected_args = []
+            for arg in all_args:
+                if isinstance(arg, Arg):
+                    obj = self.di.resolve(arg.key)
+                    injected_args.append(obj)
+                else:
+                    injected_args.append(args[args_cur_index])
+                    args_cur_index += 1
+
+            remaining_args = args[args_cur_index:]
+            if remaining_args:
+                injected_args.extend(remaining_args)
+
+            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+            if kwargs:
+                injected_kwargs.update(kwargs)
+            return wrapped(*injected_args, **injected_kwargs)
+
+        return wrapper(wrapped)
+
 
 class Injector(object):
     def __init__(self, di, *args, **kwargs):
@@ -439,19 +578,14 @@ class Injector(object):
         @wrapt.decorator(adapter=spec)
         def wrapper(wrapped, instance, args, kwargs):
             injected_args = self.di.resolve(self.args)
-            injected_kwargs = {}
-            if self.kwargs:
-                injected_kwargs.update(zip(
-                    self.kwargs.keys(), self.di.resolve(self.kwargs.values())
-                ))
+            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
 
-            def _execute(*_args, **_kwargs):
-                if _args:
-                    injected_args.extend(_args)
-                if _kwargs:
-                    injected_kwargs.update(_kwargs)
-                return wrapped(*injected_args, **injected_kwargs)
+            if args:
+                injected_args.extend(args)
+            if kwargs:
+                injected_kwargs.update(kwargs)
 
-            return _execute(*args, **kwargs)
+            return wrapped(*injected_args, **injected_kwargs)
 
         return wrapper(wrapped)
+
