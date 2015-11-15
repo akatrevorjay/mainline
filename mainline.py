@@ -10,7 +10,6 @@ import wrapt
 import os
 import itertools
 import six
-import weakref
 import sys
 
 IS_PYPY = '__pypy__' in sys.builtin_module_names
@@ -62,7 +61,7 @@ class UnresolvableError(DiError):
     pass
 
 
-class Provider(object):
+class IProvider(object):
     def __init__(self):
         pass
 
@@ -76,15 +75,21 @@ class Provider(object):
         raise NotImplementedError
 
 
-class FactoryProvider(Provider):
-    def __init__(self, factory):
+class IFactoryProvider(IProvider):
+    def __init__(self, factory=None):
+        self.set_factory(factory)
+
+    def set_factory(self, factory):
         self.factory = factory
+
+    def has_factory(self):
+        return bool(self.factory)
 
     def provide(self, *args, **kwargs):
         return self.factory(*args, **kwargs)
 
 
-class SingletonProvider(FactoryProvider):
+class SingletonProvider(IFactoryProvider):
     name = 'singleton'
 
     def provide(self, *args, **kwargs):
@@ -101,7 +106,7 @@ class SingletonProvider(FactoryProvider):
         self.instance = instance
 
 
-class ScopeProvider(FactoryProvider):
+class ScopeProvider(IFactoryProvider):
     def __init__(self, scope, factory, key=''):
         self.key = key
         self.scope = scope
@@ -146,7 +151,7 @@ class DependencyRegistry(ProxyMutableMapping):
         return itertools.ifilterfalse(self._registry.has, deps)
 
 
-class Scope(ProxyMutableMapping):
+class IScope(ProxyMutableMapping):
     register = False
     name = None
 
@@ -156,7 +161,7 @@ class Scope(ProxyMutableMapping):
     def __init__(self, *args, **kwargs):
         if self.instances is None:
             self.instances = self.instances_factory()
-        super(Scope, self).__init__(self.instances)
+        super(IScope, self).__init__(self.instances)
         self.update(dict(*args, **kwargs))
 
     def __str__(self):
@@ -176,23 +181,23 @@ class Scope(ProxyMutableMapping):
 
     def __getitem__(self, key):
         key = self._key_factory(key)
-        return super(Scope, self).__getitem__(key)
+        return super(IScope, self).__getitem__(key)
 
     def __setitem__(self, key, value):
         key = self._key_factory(key)
-        super(Scope, self).__setitem__(key, value)
+        super(IScope, self).__setitem__(key, value)
 
     def __delitem__(self, key):
         key = self._key_factory(key)
-        super(Scope, self).__delitem__(key)
+        super(IScope, self).__delitem__(key)
 
 
-class SingletonScope(Scope):
+class SingletonScope(IScope):
     register = True
     name = 'singleton'
 
 
-class ProcessScope(Scope):
+class ProcessScope(IScope):
     register = True
     name = 'process'
 
@@ -200,7 +205,7 @@ class ProcessScope(Scope):
         return '%s_%s' % (os.getpid(), key)
 
 
-class ThreadScope(Scope):
+class ThreadScope(IScope):
     register = True
     name = 'thread'
 
@@ -214,7 +219,7 @@ class ThreadScope(Scope):
         return self._thread_local.instances
 
 
-class NoneScope(Scope):
+class NoneScope(IScope):
     register = True
     name = 'none'
 
@@ -222,12 +227,7 @@ class NoneScope(Scope):
         return
 
 
-class NamedScope(Scope):
-    def __init__(self, name):
-        self.name = name
-
-
-class ProxyScope(Scope):
+class ProxyScope(IScope):
     def __init__(self, scope, *args, **kwargs):
         self.instances = scope
         super(ProxyScope, self).__init__(*args, **kwargs)
@@ -253,7 +253,7 @@ class ScopeRegistry(ProxyMutableMapping):
         self._build()
 
     def _build(self):
-        classes = Scope.__subclasses__()
+        classes = IScope.__subclasses__()
         classes = filter(lambda x: x.register, classes)
         list(map(self.register_factory, classes))
 
@@ -265,20 +265,23 @@ class ScopeRegistry(ProxyMutableMapping):
             self._factories[name] = factory
         self._factories[factory] = factory
 
-    def resolve(self, scope_or_scope_factory):
+    def resolve(self, scope_or_scope_factory, instantiate_factory=True):
         if self.is_scope_instance(scope_or_scope_factory):
             scope = scope_or_scope_factory
             return scope
         elif self.is_scope_factory(scope_or_scope_factory):
             factory = scope_or_scope_factory
-            return factory()
+            if instantiate_factory:
+                return factory()
+            else:
+                return factory
         elif scope_or_scope_factory in self._factories:
             factory = self._factories[scope_or_scope_factory]
             return self.resolve(factory)
         else:
             raise KeyError("Scope %s is not known" % scope_or_scope_factory)
 
-    _scope_type = Scope
+    _scope_type = IScope
 
     @classmethod
     def is_scope_factory(cls, obj):
@@ -293,36 +296,86 @@ class ScopeRegistry(ProxyMutableMapping):
         return cls.is_scope_factory(obj) or cls.is_scope_instance(obj)
 
 
-class AutoInjector(object):
-    def __init__(self, di, *args, **kwargs):
+class Injector(object):
+    def __init__(self, di):
         self.di = di
+
+    def __call__(self, wrapped):
+        raise NotImplementedError
+
+    def decorate(self, wrapped):
+        raise NotImplementedError
+
+
+class CallableInjector(Injector):
+    def __init__(self, di, *args, **kwargs):
+        super(CallableInjector, self).__init__(di)
         self.args = args
         self.kwargs = kwargs
 
     def __call__(self, wrapped):
-        if not any([self.args, self.kwargs]):
-            self.provider_keys = self.di._depends.get(wrapped)
-        else:
-            self.provider_keys = []
-            if self.args:
-                self.provider_keys.extend(self.args)
-            if self.kwargs:
-                self.provider_keys.extend(self.kwargs.values())
-            self.di._depends.add(wrapped, *self.provider_keys)
+        if isinstance(wrapped, six.class_types):
+            cls = wrapped
+            try:
+                cls_init = six.get_unbound_function(cls.__init__)
+                assert cls_init is not OBJECT_INIT
+            except (AttributeError, AssertionError):
+                raise DiError('Class %s has no __init__ to inject' % cls)
+            cls.__init__ = self(cls_init)
+            return cls
 
+        if not any([self.args, self.kwargs]):
+            self.injectables = self.di._depends.get(wrapped)
+        else:
+            self.injectables = []
+            if self.args:
+                self.injectables.extend(self.args)
+            if self.kwargs:
+                self.injectables.extend(self.kwargs.values())
+            self.di._depends.add(wrapped, *self.injectables)
+
+        return self.decorate(wrapped)
+
+
+class SpecInjector(CallableInjector):
+    def decorate(self, wrapped):
+        # Remove the number of args from the wrapped function's argspec
+        spec = inspect.getargspec(wrapped)
+        new_args = spec.args[len(self.injectables):]
+
+        # Update argspec
+        spec = inspect.ArgSpec(new_args, *spec[1:])
+
+        @wrapt.decorator(adapter=spec)
+        def decorator(wrapped, instance, args, kwargs):
+            injected_args = self.di.resolve(self.injectables)
+            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+
+            if args:
+                injected_args.extend(args)
+            if kwargs:
+                injected_kwargs.update(kwargs)
+
+            return wrapped(*injected_args, **injected_kwargs)
+
+        return decorator(wrapped)
+
+
+class AutoSpecInjector(CallableInjector):
+    def decorate(self, wrapped):
         spec = inspect.getargspec(wrapped)
 
-        def wrapper(*args, **kwargs):
-            if self.provider_keys:
-                provider_keys = self.provider_keys
+        def decorator(*args, **kwargs):
+            if self.injectables:
+                injectables = self.injectables
             else:
-                provider_keys = self.di.keys()
+                injectables = self.di.keys()
 
             injected_args = []
             args_cur_index = 0
             for arg in spec.args:
                 arg = self.kwargs.pop(arg, arg)
-                if arg in provider_keys:
+                if arg in injectables:
                     obj = self.di.resolve(arg)
                     injected_args.append(obj)
                 else:
@@ -338,49 +391,42 @@ class AutoInjector(object):
 
             return wrapped(*injected_args, **injected_kwargs)
 
-        return wrapper
+        return decorator
 
 
-class Injector(object):
-    def __init__(self, di, *args, **kwargs):
-        self.di = di
-        self.args = args
-        self.kwargs = kwargs
+class ClassPropertyInjector(Injector):
+    def __init__(self, di, key, name=None, replace_on_access=False):
+        super(ClassPropertyInjector, self).__init__(di)
+        self.key = key
+        self.name = name
+        self.replace_on_access = replace_on_access
 
-    def __call__(self, wrapped):
-        if not any([self.args, self.kwargs]):
-            self.args = self.di._depends.get(wrapped)
-        else:
-            injections = []
-            if self.args:
-                injections.extend(self.args)
-            if self.kwargs:
-                injections.extend(self.kwargs.values())
-            self.di._depends.add(wrapped, *injections)
+    def _wrap_classproperty(self, cls, key, name, replace_on_access, owner=None):
+        # owner is set to the instance if applicable
+        val = self.di.resolve(key)
+        if replace_on_access:
+            setattr(cls, name, val)
+        return val
 
-        # Remove the number of args from the wrapped function's argspec
-        spec = inspect.getargspec(wrapped)
-        new_args = spec.args[len(self.args):]
+    def __call__(self, klass):
+        name = self.name or self.key
 
-        # Update argspec
-        spec = inspect.ArgSpec(new_args, *spec[1:])
+        # Register as dependency for klass
+        self.di._depends.add(klass, self.key)
 
-        @wrapt.decorator(adapter=spec)
-        def wrapper(wrapped, instance, args, kwargs):
-            injected_args = self.di.resolve(self.args)
-            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+        # Add in arguments
+        partial = functools.partial(self._wrap_classproperty, klass, self.key, name, self.replace_on_access)
+        # Create classproperty from it
+        clsprop = classproperty(partial)
 
-            if args:
-                injected_args.extend(args)
-            if kwargs:
-                injected_kwargs.update(kwargs)
+        # Attach descriptor to object
+        setattr(klass, name, clsprop)
 
-            return wrapped(*injected_args, **injected_kwargs)
-
-        return wrapper(wrapped)
+        # Return class as this is a decorator
+        return klass
 
 
-class DiCatalogMeta(type):
+class CatalogMeta(type):
     def __new__(mcs, class_name, bases, attributes):
         # providers = {}
         #
@@ -395,28 +441,31 @@ class DiCatalogMeta(type):
         cls = type.__new__(mcs, class_name, bases, attributes)
 
         providers = {k: v for k, v in six.iteritems(attributes)
-                     if isinstance(v, Provider)}
-        cls.providers = providers
-
-        cls.attrs = attributes
-        cls.bases = bases
-        cls.name = class_name
+                     if isinstance(v, IProvider)}
+        cls._providers = providers
 
         return cls
 
 
-@six.add_metaclass(DiCatalogMeta)
-class DiCatalog(object):
-    di = None
+@six.add_metaclass(CatalogMeta)
+class Catalog(object):
+    @classmethod
+    def get_providers(cls):
+        return cls._providers
 
-    def __init__(self, di):
-        pass
+
+class ScopeProviderDecorator(object):
+    _provider_cls = ScopeProvider
+
+    def __init__(self, scope):
+        self.scope = scope
+
+    def __call__(self, factory):
+        provider = self._provider_cls(self.scope, factory)
+        return provider
 
 
 class Di(ProxyMutableMapping):
-    # Scope = Scope
-    NamedScope = NamedScope
-
     _sentinel = object()
 
     def __init__(self):
@@ -425,53 +474,25 @@ class Di(ProxyMutableMapping):
         self._depends = DependencyRegistry(self._providers)
         self._scopes = ScopeRegistry()
 
-        self.Catalog.di = self
+    ''' Catalog '''
 
-    class Catalog(DiCatalog):
-        pass
+    Catalog = Catalog
+
+    def update_from_catalog(self, catalog):
+        self.update(catalog.get_providers())
+
+    def provider(self, scope='singleton'):
+        scope = self._scopes.resolve(scope)
+        return ScopeProviderDecorator(scope)
 
     ''' API '''
 
-    def register_factory(self, key, factory=_sentinel, scope='singleton'):
-        if factory is self._sentinel:
-            return functools.partial(self.register_factory, key, scope=scope)
-        if key in self._providers:
-            raise KeyError("Key %s already exists" % key)
-        scope = self._scopes.resolve(scope)
-        self._providers[key] = ScopeProvider(scope, factory)
-        return factory
-
-    def add_instance(self, key, instance, default_scope='singleton'):
+    def set_instance(self, key, instance, default_scope='singleton'):
         if key not in self._providers:
             # We don't know how to create this kind of instance at this time, so add it without a factory.
             factory = None
             self.register_factory(key, factory, default_scope)
         self._providers[key].set_instance(instance)
-
-    def _coerce_key_or_keys(self, key_or_keys, *more_keys):
-        keys = []
-        return_list = True
-
-        if more_keys:
-            # Multiple arguments given
-            keys.append(key_or_keys)
-            keys.extend(more_keys)
-        elif isinstance(key_or_keys, (list, tuple)):
-            # Singular item; treat as an iterable
-            keys.extend(key_or_keys)
-        else:
-            # Singular str
-            keys.append(key_or_keys)
-            return_list = False
-
-        return keys, return_list
-
-    def depends_on(self, *keys):
-        def decorator(method):
-            self._depends.add(method, *keys)
-            return method
-
-        return decorator
 
     def get_deps(self, obj):
         return self._depends.get(obj)
@@ -486,13 +507,16 @@ class Di(ProxyMutableMapping):
 
         return provider()
 
-    def resolve(self, key_or_keys, *more_keys):
-        # only py3k can have default args with *args
-        keys, return_list = self._coerce_key_or_keys(key_or_keys, *more_keys)
+    def resolve(self, *keys):
+        if len(keys) == 1 and isinstance(keys[0], (list, tuple)):
+            keys = keys[0]
+            return_list = True
+        else:
+            return_list = False
+
         ret = list(map(self._resolve_one, keys))
 
         if return_list:
-            # Always return a sequence when given multiple arguments
             return ret
         else:
             return ret[0]
@@ -501,40 +525,29 @@ class Di(ProxyMutableMapping):
         deps = self.get_deps(obj)
         return self.resolve(deps, **kwargs)
 
-    def _wrap_classproperty(self, cls, key, name, replace_on_access, owner=None):
-        # owner is set to the instance if applicable
-        val = self.resolve(key)
-        if replace_on_access:
-            setattr(cls, name, val)
-        return val
+    ''' Decorators '''
 
-    def inject_classproperty(self, key, klass=None, name=None, replace_on_access=False):
-        if klass is None:
-            return functools.partial(
-                self.inject_classproperty,
-                key, name=name,
-                replace_on_access=replace_on_access,
-            )
+    def register_factory(self, key, factory=_sentinel, scope='singleton'):
+        if factory is self._sentinel:
+            return functools.partial(self.register_factory, key, scope=scope)
+        if self._providers.has(key):
+            raise KeyError("Key %s already exists" % key)
+        provider = self.provider(scope)(factory)
+        self._providers[key] = provider
+        return factory
 
-        if not name:
-            name = key
+    def depends_on(self, *keys):
+        def decorator(method):
+            self._depends.add(method, *keys)
+            return method
 
-        # Register as dependency for klass
-        self._depends.add(klass, key)
+        return decorator
 
-        # Add in arguments
-        partial = functools.partial(self._wrap_classproperty, klass, key, name, replace_on_access)
-        # Create classproperty from it
-        clsprop = classproperty(partial)
-
-        # Attach descriptor to object
-        setattr(klass, name, clsprop)
-
-        # Return class as this is a decorator
-        return klass
+    def inject_classproperty(self, key, name=None, replace_on_access=False):
+        return ClassPropertyInjector(self, key, name=name, replace_on_access=replace_on_access)
 
     def inject(self, *args, **kwargs):
-        return Injector(self, *args, **kwargs)
+        return SpecInjector(self, *args, **kwargs)
 
     def auto_inject(self, *args, **kwargs):
-        return AutoInjector(self, *args, **kwargs)
+        return AutoSpecInjector(self, *args, **kwargs)
