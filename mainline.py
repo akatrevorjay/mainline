@@ -28,6 +28,32 @@ class classproperty(object):
         return self.f(owner)
 
 
+class ProxyMutableMapping(collections.MutableMapping):
+    def __init__(self, mapping):
+        self.__mapping = mapping
+
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.__mapping)
+
+    def __contains__(self, item):
+        return item in self.__mapping
+
+    def __getitem__(self, item):
+        return self.__mapping[item]
+
+    def __setitem__(self, key, value):
+        self.__mapping[key] = value
+
+    def __delitem__(self, key):
+        del self.__mapping[key]
+
+    def __iter__(self):
+        return iter(self.__mapping)
+
+    def __len__(self):
+        return len(self.__mapping)
+
+
 class DiError(Exception):
     pass
 
@@ -82,7 +108,9 @@ class ScopeProvider(FactoryProvider):
         super(ScopeProvider, self).__init__(factory)
 
     def __repr__(self):
-        return '<%s scope=%s>' % (self.__class__.__name__, self.scope)
+        return '<%s factory=%s scope=%s>' % (self.__class__.__name__,
+                                             self.factory,
+                                             self.scope)
 
     def provide(self, *args, **kwargs):
         if self.key in self.scope:
@@ -99,26 +127,26 @@ class ProviderRegistry(dict):
     has = dict.__contains__
 
 
-class DependencyRegistry(object):
+class DependencyRegistry(ProxyMutableMapping):
     def __init__(self, registry):
         self._registry = registry
         self._map = collections.defaultdict(set)
+        super(DependencyRegistry, self).__init__(self._map)
 
     def add(self, obj, *keys):
         for k in keys:
             self._map[obj].add(k)
 
     def missing(self, obj):
+        if obj not in self._map:
+            return
         deps = self.get(obj)
         if not deps:
             return
         return itertools.ifilterfalse(self._registry.has, deps)
 
-    def get(self, obj, default=None):
-        return self._map.get(obj, default)
 
-
-class Scope(collections.MutableMapping):
+class Scope(ProxyMutableMapping):
     register = False
     name = None
 
@@ -128,7 +156,11 @@ class Scope(collections.MutableMapping):
     def __init__(self, *args, **kwargs):
         if self.instances is None:
             self.instances = self.instances_factory()
+        super(Scope, self).__init__(self.instances)
         self.update(dict(*args, **kwargs))
+
+    def __str__(self):
+        return self.name
 
     def __key_transform__(self, key):
         return key
@@ -144,24 +176,15 @@ class Scope(collections.MutableMapping):
 
     def __getitem__(self, key):
         key = self._key_factory(key)
-        return self.instances[key]
+        return super(Scope, self).__getitem__(key)
 
     def __setitem__(self, key, value):
         key = self._key_factory(key)
-        self.instances[key] = value
+        super(Scope, self).__setitem__(key, value)
 
     def __delitem__(self, key):
         key = self._key_factory(key)
-        del self.instances[key]
-
-    def __iter__(self):
-        return iter(self.instances)
-
-    def __len__(self):
-        return len(self.instances)
-
-    def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, dict(self))
+        super(Scope, self).__delitem__(key)
 
 
 class SingletonScope(Scope):
@@ -223,9 +246,10 @@ class NamespacedChildScope(ProxyScope):
         return '%s__%s' % (self.namespace, key)
 
 
-class ScopeRegistry(object):
+class ScopeRegistry(ProxyMutableMapping):
     def __init__(self):
         self._factories = {}
+        super(ScopeRegistry, self).__init__(self._factories)
         self._build()
 
     def _build(self):
@@ -235,8 +259,8 @@ class ScopeRegistry(object):
 
     def register_factory(self, factory, name=None):
         if name is None:
+            # name = str(factory)
             name = getattr(factory, 'name', None)
-
         if name:
             self._factories[name] = factory
         self._factories[factory] = factory
@@ -252,7 +276,7 @@ class ScopeRegistry(object):
             factory = self._factories[scope_or_scope_factory]
             return self.resolve(factory)
         else:
-            raise KeyError("Scope %s is not known" % scope)
+            raise KeyError("Scope %s is not known" % scope_or_scope_factory)
 
     _scope_type = Scope
 
@@ -269,7 +293,7 @@ class ScopeRegistry(object):
         return cls.is_scope_factory(obj) or cls.is_scope_instance(obj)
 
 
-class Di(collections.MutableMapping):
+class Di(ProxyMutableMapping):
     # Scope = Scope
     NamedScope = NamedScope
 
@@ -277,28 +301,9 @@ class Di(collections.MutableMapping):
 
     def __init__(self):
         self._providers = ProviderRegistry()
+        super(Di, self).__init__(self._providers)
         self._depends = DependencyRegistry(self._providers)
         self._scopes = ScopeRegistry()
-
-    ''' MutableMapping interface '''
-
-    def __contains__(self, item):
-        return item in self._providers
-
-    def __getitem__(self, item):
-        return self._providers[item]
-
-    def __setitem__(self, key, value):
-        self._providers[key] = value
-
-    def __delitem__(self, key):
-        del self._providers[key]
-
-    def __iter__(self):
-        return iter(self._providers)
-
-    def __len__(self):
-        return len(self._providers)
 
     ''' API '''
 
@@ -326,7 +331,7 @@ class Di(collections.MutableMapping):
             # Multiple arguments given
             keys.append(key_or_keys)
             keys.extend(more_keys)
-        elif isinstance(key_or_keys, list):
+        elif isinstance(key_or_keys, (list, tuple)):
             # Singular item; treat as an iterable
             keys.extend(key_or_keys)
         else:
@@ -403,32 +408,51 @@ class Di(collections.MutableMapping):
         # Return class as this is a decorator
         return klass
 
-    def provide_args(self, wrapped=None, args=None):
-        if wrapped is None:
-            return functools.partial(self.provide_args, args=args)
+    def inject(self, *args, **kwargs):
+        return Injector(self, *args, **kwargs)
 
-        if args:
-            self._depends.add(wrapped, *args)
+
+class Injector(object):
+    def __init__(self, di, *args, **kwargs):
+        self.di = di
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, wrapped):
+        if not any([self.args, self.kwargs]):
+            self.args = self.di._depends.get(wrapped)
         else:
-            args = self._depends.get(wrapped)
+            injections = []
+            if self.args:
+                injections.extend(self.args)
+            if self.kwargs:
+                injections.extend(self.kwargs.values())
+            self.di._depends.add(wrapped, *injections)
 
-        # HACK Remove the number of arguments from the wrapped function's argspec
+        # Remove the number of args from the wrapped function's argspec
         spec = inspect.getargspec(wrapped)
-        sargs = spec.args[len(args):]
+        new_args = spec.args[len(self.args):]
 
         # Update argspec
-        spec = inspect.ArgSpec(sargs, *spec[1:])
+        spec = inspect.ArgSpec(new_args, *spec[1:])
 
         @wrapt.decorator(adapter=spec)
-        def wrapper(wrapped, instance, wargs, wkwargs):
-            injected_args = self.resolve(args)
+        def wrapper(wrapped, instance, args, kwargs):
+            injected_args = self.di.resolve(self.args)
+            injected_kwargs = {}
+            if self.kwargs:
+                injected_kwargs.update(zip(
+                    self.kwargs.keys(), self.di.resolve(self.kwargs.values())
+                ))
 
-            def _execute(*_wargs, **_wkwargs):
-                if _wargs:
-                    injected_args.extend(_wargs)
-                return wrapped(*injected_args, **_wkwargs)
+            def _execute(*_args, **_kwargs):
+                if _args:
+                    injected_args.extend(_args)
+                if _kwargs:
+                    injected_kwargs.update(_kwargs)
+                return wrapped(*injected_args, **injected_kwargs)
 
-            return _execute(*wargs, **wkwargs)
+            return _execute(*args, **kwargs)
 
         return wrapper(wrapped)
 
