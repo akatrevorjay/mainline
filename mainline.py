@@ -14,9 +14,9 @@ import weakref
 import sys
 
 IS_PYPY = '__pypy__' in sys.builtin_module_names
-if IS_PYPY or six.PY3:  # pragma: no cover
+if IS_PYPY or six.PY3:
     OBJECT_INIT = six.get_unbound_function(object.__init__)
-else:  # pragma: no cover
+else:
     OBJECT_INIT = None
 
 
@@ -233,10 +233,10 @@ class ProxyScope(Scope):
         super(ProxyScope, self).__init__(*args, **kwargs)
 
 
-class NamespacedChildScope(ProxyScope):
-    def __init__(self, name, *args, **kwargs):
-        self.namespace = name
-        super(NamespacedChildScope, self).__init__(*args, **kwargs)
+class NamespacedProxyScope(ProxyScope):
+    def __init__(self, namespace, scope, *args, **kwargs):
+        self.namespace = namespace
+        super(NamespacedProxyScope, self).__init__(scope, *args, **kwargs)
 
     @property
     def name(self):
@@ -455,7 +455,3 @@ class Injector(object):
             return _execute(*args, **kwargs)
 
         return wrapper(wrapped)
-
-
-di = Di()
-di.add_instance('di', di)
