@@ -1,0 +1,138 @@
+import functools
+import inspect
+
+import six
+import wrapt
+
+from mainline.exceptions import DiError
+from mainline.utils import OBJECT_INIT, classproperty
+
+
+class Injector(object):
+    def __init__(self, di):
+        self.di = di
+
+    def __call__(self, wrapped):
+        raise NotImplementedError
+
+    def decorate(self, wrapped):
+        raise NotImplementedError
+
+
+class CallableInjector(Injector):
+    def __init__(self, di, *args, **kwargs):
+        super(CallableInjector, self).__init__(di)
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self, wrapped):
+        if isinstance(wrapped, six.class_types):
+            cls = wrapped
+            try:
+                cls_init = six.get_unbound_function(cls.__init__)
+                assert cls_init is not OBJECT_INIT
+            except (AttributeError, AssertionError):
+                raise DiError('Class %s has no __init__ to inject' % cls)
+            cls.__init__ = self(cls_init)
+            return cls
+
+        if not any([self.args, self.kwargs]):
+            self.injectables = self.di._depends.get(wrapped)
+        else:
+            self.injectables = []
+            if self.args:
+                self.injectables.extend(self.args)
+            if self.kwargs:
+                self.injectables.extend(self.kwargs.values())
+            self.di._depends.add(wrapped, *self.injectables)
+
+        return self.decorate(wrapped)
+
+
+class SpecInjector(CallableInjector):
+    def decorate(self, wrapped):
+        # Remove the number of args from the wrapped function's argspec
+        spec = inspect.getargspec(wrapped)
+        new_args = spec.args[len(self.injectables):]
+
+        # Update argspec
+        spec = inspect.ArgSpec(new_args, *spec[1:])
+
+        @wrapt.decorator(adapter=spec)
+        def decorator(wrapped, instance, args, kwargs):
+            injected_args = self.di.resolve(self.injectables)
+            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+
+            if args:
+                injected_args.extend(args)
+            if kwargs:
+                injected_kwargs.update(kwargs)
+
+            return wrapped(*injected_args, **injected_kwargs)
+
+        return decorator(wrapped)
+
+
+class AutoSpecInjector(CallableInjector):
+    def decorate(self, wrapped):
+        spec = inspect.getargspec(wrapped)
+
+        def decorator(*args, **kwargs):
+            if self.injectables:
+                injectables = self.injectables
+            else:
+                injectables = self.di.keys()
+
+            injected_args = []
+            args_cur_index = 0
+            for arg in spec.args:
+                arg = self.kwargs.pop(arg, arg)
+                if arg in injectables:
+                    obj = self.di.resolve(arg)
+                    injected_args.append(obj)
+                else:
+                    injected_args.append(args[args_cur_index])
+                    args_cur_index += 1
+            remaining_args = args[args_cur_index:]
+            if remaining_args:
+                injected_args.extend(remaining_args)
+
+            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+            if kwargs:
+                injected_kwargs.update(kwargs)
+
+            return wrapped(*injected_args, **injected_kwargs)
+
+        return decorator
+
+
+class ClassPropertyInjector(Injector):
+    def __init__(self, di, key, name=None, replace_on_access=False):
+        super(ClassPropertyInjector, self).__init__(di)
+        self.key = key
+        self.name = name
+        self.replace_on_access = replace_on_access
+
+    def _wrap_classproperty(self, cls, key, name, replace_on_access, owner=None):
+        # owner is set to the instance if applicable
+        val = self.di.resolve(key)
+        if replace_on_access:
+            setattr(cls, name, val)
+        return val
+
+    def __call__(self, klass):
+        name = self.name or self.key
+
+        # Register as dependency for klass
+        self.di._depends.add(klass, self.key)
+
+        # Add in arguments
+        partial = functools.partial(self._wrap_classproperty, klass, self.key, name, self.replace_on_access)
+        # Create classproperty from it
+        clsprop = classproperty(partial)
+
+        # Attach descriptor to object
+        setattr(klass, name, clsprop)
+
+        # Return class as this is a decorator
+        return klass
