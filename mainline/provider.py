@@ -8,6 +8,9 @@ class IProvider(object):
     def provide(self, *args, **kwargs):
         raise NotImplementedError
 
+    def has_instance(self):
+        raise NotImplementedError
+
     def set_instance(self, instance):
         raise NotImplementedError
 
@@ -25,19 +28,25 @@ class IFactoryProvider(IProvider):
     def provide(self, *args, **kwargs):
         return self.factory(*args, **kwargs)
 
+    def has_instance(self):
+        return False
+
 
 class SingletonProvider(IFactoryProvider):
     name = 'singleton'
 
     def provide(self, *args, **kwargs):
-        if not hasattr(self, 'instance'):
+        if not self.has_instance():
             instance = super(SingletonProvider, self).provide(*args, **kwargs)
             self.set_instance(instance)
         return self.instance
 
     def reset(self):
-        if hasattr(self, 'instance'):
+        if self.has_instance():
             delattr(self, 'instance')
+
+    def has_instance(self):
+        return hasattr(self, 'instance')
 
     def set_instance(self, instance):
         self.instance = instance
@@ -55,11 +64,14 @@ class ScopeProvider(IFactoryProvider):
                                              self.scope)
 
     def provide(self, *args, **kwargs):
-        if self.key in self.scope:
+        if self.has_instance():
             return self.scope[self.key]
         instance = super(ScopeProvider, self).provide(*args, **kwargs)
         self.set_instance(instance)
         return instance
+
+    def has_instance(self):
+        return self.key in self.scope
 
     def set_instance(self, instance):
         self.scope[self.key] = instance

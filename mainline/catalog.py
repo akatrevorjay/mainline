@@ -19,16 +19,14 @@ class CatalogMeta(type):
 
         providers = {k: v for k, v in six.iteritems(attributes)
                      if isinstance(v, IProvider)}
-        cls._providers = providers
+        cls.providers = providers
 
         return cls
 
 
 @six.add_metaclass(CatalogMeta)
 class Catalog(object):
-    @classmethod
-    def get_providers(cls):
-        return cls._providers
+    pass
 
 
 class ScopeProviderDecorator(object):

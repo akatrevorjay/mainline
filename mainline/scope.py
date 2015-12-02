@@ -97,3 +97,56 @@ class NamespacedProxyScope(ProxyScope):
 
     def __key_transform__(self, key):
         return '%s__%s' % (self.namespace, key)
+
+
+class ScopeRegistry(ProxyMutableMapping):
+    def __init__(self):
+        self._factories = {}
+        super(ScopeRegistry, self).__init__(self._factories)
+        self._build()
+
+    def _build(self):
+        classes = IScope.__subclasses__()
+        classes = filter(lambda x: x.register, classes)
+        list(map(self.register_factory, classes))
+
+    def register_factory(self, factory, name=None):
+        if name is None:
+            # name = str(factory)
+            name = getattr(factory, 'name', None)
+        if name:
+            self._factories[name] = factory
+        self._factories[factory] = factory
+
+    def resolve(self, scope_or_scope_factory, instantiate_factory=True):
+        if self.is_scope_instance(scope_or_scope_factory):
+            instance = scope_or_scope_factory
+            return instance
+
+        elif self.is_scope_factory(scope_or_scope_factory):
+            factory = scope_or_scope_factory
+            if not instantiate_factory:
+                return factory
+            instance = factory()
+            return instance
+
+        elif scope_or_scope_factory in self._factories:
+            factory = self._factories[scope_or_scope_factory]
+            return self.resolve(factory)
+
+        else:
+            raise KeyError("Scope %s is not known" % scope_or_scope_factory)
+
+    _scope_type = IScope
+
+    @classmethod
+    def is_scope_factory(cls, obj):
+        return callable(obj) and issubclass(obj, cls._scope_type)
+
+    @classmethod
+    def is_scope_instance(cls, obj):
+        return isinstance(obj, cls._scope_type)
+
+    @classmethod
+    def is_scope(cls, obj):
+        return cls.is_scope_factory(obj) or cls.is_scope_instance(obj)
