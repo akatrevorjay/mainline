@@ -9,7 +9,7 @@ pytest_runner = ['pytest-runner'] if needs_pytest else []
 
 conf = dict(
     name='mainline',
-    description='Depdendency injection for all, not just humans.',
+    description='Simple yet powerful python dependency injection for py2/py3k',
     url='http://github.com/vkgit/mainline',
     author='Trevor Joynson',
     author_email='github@skywww.net',
