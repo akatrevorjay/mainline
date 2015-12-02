@@ -197,6 +197,17 @@ class TestDi(object):
 
         assert isinstance(injected(), Test)
 
+        '''
+        Injection on object init
+        '''
+
+        @di.inject('apple')
+        class Injectee(object):
+            def __init__(self, apple):
+                self.apple = apple
+
+        assert Injectee().apple == apple()
+
     def test_example_inject_classproperty(self, di):
         @di.register_factory('apple')
         def apple():

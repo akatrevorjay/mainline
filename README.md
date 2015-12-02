@@ -5,6 +5,12 @@ Simple yet powerful python dependency injection.
 
 Tested with Python 2.7+ (including py3k).
 
+Installation
+------------
+
+```sh
+pip install mainline
+```
 
 Examples
 --------
@@ -100,6 +106,17 @@ def injected(test):
     return test
 
 assert isinstance(injected(), Test)
+
+'''
+Injection on object init
+'''
+
+@di.inject('apple')
+class Injectee(object):
+    def __init__(self, apple):
+        self.apple = apple
+
+assert Injectee().apple == apple()
 ```
 
 ### Injection as a classproperty
@@ -151,4 +168,12 @@ def injected(apple, arg1, banana=None):
     return apple, arg1, banana
 
 assert injected('arg1') == (apple(), 'arg1', banana())
+```
+
+Running tests
+-------------
+
+```sh
+# From git checkout:
+python setup.py test
 ```
