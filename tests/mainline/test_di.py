@@ -34,25 +34,19 @@ class TestDi(object):
     def dependency_kv(self, di, request):
         key, deps = request.param
         di._dependencies[key] = deps
+        for dep in deps:
+            di._providers[dep] = mock.MagicMock(return_value=object())
 
         def fin():
             del di._dependencies[key]
+            for dep in deps:
+                del di._providers[dep]
 
         request.addfinalizer(fin)
         return key, deps
 
     def test_assert_test_env(self, di):
         assert self.all_scopeish
-
-    @pytest.mark.parametrize('scope', all_scopeish)
-    def test_resolve_factory_for_each_scope(self, di, scope):
-        key = 'test_factory_scope_%s' % scope
-        factory = mock.MagicMock(return_value=object())
-        di.register_factory(key, factory, scope=scope)
-
-        instance = di.resolve(key)
-        factory.assert_called_once_with()
-        assert instance is factory.return_value
 
     def test_set_instance(self, di, provider_kv):
         key, provider = provider_kv
@@ -90,12 +84,41 @@ class TestDi(object):
         assert di.resolve(key) == provider.return_value
         provider.assert_called_with()
 
+    def test_resolve_unresolvable(self, di):
+        di._dependencies['missing_deps'] = set(['missing_dep0'])
+        di._providers['missing_deps'] = mock.MagicMock()
+        with pytest.raises(Di.UnresolvableError):
+            di.resolve('missing_deps')
+
     def test_resolve_many(self, di):
         providers = dict(
-            mock_provider_uno=mock.MagicMock(return_value=object()),
-            mock_provider_dos=mock.MagicMock(return_value=object()),
+                mock_provider_uno=mock.MagicMock(return_value=object()),
+                mock_provider_dos=mock.MagicMock(return_value=object()),
         )
         di._providers.update(providers)
 
         items = [(k, v.return_value) for k, v in providers.items()]
         assert di.resolve(*[x[0] for x in items]) == [x[1] for x in items]
+
+    def test_resolve_deps(self, di, dependency_kv):
+        key, deps = dependency_kv
+        values = [di.resolve(dep) for dep in deps]
+        assert set(di.resolve_deps(key)) == set(values)
+
+    @pytest.mark.parametrize('scope', all_scopeish)
+    def test_resolve_factory_for_each_scope(self, di, scope):
+        key = 'test_factory_scope_%s' % scope
+        factory = mock.MagicMock(return_value=object())
+        di.register_factory(key, factory, scope=scope)
+
+        instance = di.resolve(key)
+        factory.assert_called_once_with()
+        assert instance is factory.return_value
+
+    @pytest.mark.parametrize('deps', [('dep0',), ('dep0', 'dep1')])
+    def test_depends_on(self, di, deps):
+        @di.depends_on(*deps)
+        def test():
+            pass
+
+        assert di.get_deps(test) == set(deps)
