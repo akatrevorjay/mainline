@@ -5,16 +5,6 @@ from mainline.provider import IProvider, ScopeProvider
 
 class CatalogMeta(type):
     def __new__(mcs, class_name, bases, attributes):
-        # providers = {}
-        #
-        # for base in bases:
-        #     if not isinstance(base, DiCatalog):
-        #         continue
-        #     providers.update(base.providers)
-        #
-        # providers.update({k: v for k, v in six.iteritems(attributes)
-        #                   if isinstance(v, Provider)})
-
         cls = type.__new__(mcs, class_name, bases, attributes)
 
         providers = {k: v for k, v in six.iteritems(attributes)
