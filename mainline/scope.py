@@ -1,5 +1,6 @@
 import os
 import threading
+import collections
 
 from mainline.utils import ProxyMutableMapping
 
@@ -137,7 +138,7 @@ class ScopeRegistry(ProxyMutableMapping):
         else:
             raise KeyError("Scope %s is not known" % scope_or_scope_factory)
 
-    _scope_type = IScope
+    _scope_type = collections.MutableMapping
 
     @classmethod
     def is_scope_factory(cls, obj):
