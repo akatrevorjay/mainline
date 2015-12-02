@@ -5,6 +5,8 @@ Simple yet powerful python dependency injection.
 
 Tested with Python 2.7+ (including py3k).
 
+[![Test Status](https://circleci.com/gh/vertical-knowledge/mainline.svg?style=svg)](https://circleci.com/gh/vertical-knowledge/mainline) [![Coverage Status](https://coveralls.io/repos/vertical-knowledge/mainline/badge.svg?branch=develop&service=github)](https://coveralls.io/github/vertical-knowledge/mainline?branch=develop)
+
 Installation
 ------------
 
