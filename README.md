@@ -136,7 +136,9 @@ class Injectee(object):
 assert Injectee.apple == apple()
 ```
 
-### Auto injection based on named in argspec
+### Auto injection based on name in argspec
+
+Do yourself a favor and use this sparingly. The magic on this one is real.
 
 ```py
 from mainline import DI
