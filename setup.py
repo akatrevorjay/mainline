@@ -14,8 +14,8 @@ conf = dict(
     author='Trevor Joynson',
     author_email='github@skywww.net',
     license='GPL',
-    # keywords=[],
-    # classifiers=[],
+    keywords=['dependency', 'injection', 'ioc'],
+    classifiers=[],
 
     version=__version__,
     packages=['mainline'],
