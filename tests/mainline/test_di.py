@@ -158,6 +158,35 @@ class TestDi(object):
 
         assert injected('arg1') == (apple(), 'arg1', banana())
 
+        @di.register_factory('orange')
+        @di.inject('apple', not_an_apple='banana')
+        def orange(apple, not_an_apple):
+            return 'orange', not_an_apple
+
+        @di.inject('apple', 'orange', omg='banana')
+        def injected(apple, orange, arg1, omg=None):
+            return apple, orange, arg1, omg
+
+        assert injected('arg1') == (apple(), orange(), 'arg1', banana())
+
+        '''
+        Provider keys don't have to be strings
+        '''
+
+        class Test(object):
+            pass
+
+        # Thread scopes are stored in a thread local
+        @di.register_factory(Test, scope='thread')
+        def test_factory():
+            return Test()
+
+        @di.inject(Test)
+        def injected(test):
+            return test
+
+        assert isinstance(injected(), Test)
+
     def test_example_inject_classproperty(self, di):
         @di.register_factory('apple')
         def apple():
