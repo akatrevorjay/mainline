@@ -136,12 +136,14 @@ class Di(object):
         :rtype: generator
         '''
         for key in keys:
-            provider = self.get_provider(key)
-
             missing = self.get_missing_deps(key)
             if missing:
                 raise UnresolvableError("Missing dependencies for %s: %s" % (key, missing))
 
+            try:
+                provider = self.get_provider(key)
+            except KeyError:
+                raise UnresolvableError("Provider does not exist for %s" % key)
             yield provider()
 
     def resolve(self, *keys):
