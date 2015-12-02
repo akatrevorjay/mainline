@@ -23,6 +23,22 @@ def apple():
 assert di.resolve('apple') == 'apple'
 ```
 
+### Simple instance registration
+
+```py
+from mainline import DI
+di = Di()
+
+apple = object()
+di.set_instance('apple', apple)
+assert di.resolve('apple') == apple
+
+# If no factory is registered already with this key, one is created using the optional default_scope keyword argument, which defaults to singleton.
+banana = object()
+di.set_instance('banana', banana, default_scope='singleton')
+assert di.resolve('banana') == banana
+```
+
 ### Injection of positional and keyword arguments
 
 ```py

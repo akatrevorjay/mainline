@@ -130,6 +130,16 @@ class TestDi(object):
 
         assert di.resolve('apple') == 'apple'
 
+    def test_example_set_instance(self, di):
+        apple = object()
+        di.set_instance('apple', apple)
+        assert di.resolve('apple') == apple
+
+        # If no factory is registered already with this key, one is created using the optional default_scope keyword argument, which defaults to singleton.
+        banana = object()
+        di.set_instance('banana', banana, default_scope='singleton')
+        assert di.resolve('banana') == banana
+
     def test_example_inject(self, di):
         @di.register_factory('apple')
         def apple():
