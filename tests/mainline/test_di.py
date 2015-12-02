@@ -122,3 +122,77 @@ class TestDi(object):
             pass
 
         assert di.get_deps(test) == set(deps)
+
+    def test_example_resolve(self, di):
+        @di.register_factory('apple')
+        def apple():
+            return 'apple'
+
+        assert di.resolve('apple') == 'apple'
+
+    def test_example_inject(self, di):
+        @di.register_factory('apple')
+        def apple():
+            return 'apple'
+
+        @di.inject('apple')
+        def injected(apple):
+            return apple
+
+        assert injected() == apple()
+
+        @di.inject('apple')
+        def injected(apple, arg1):
+            return apple, arg1
+
+        assert injected('arg1') == (apple(), 'arg1')
+
+        @di.register_factory('banana')
+        @di.inject('apple')
+        def banana(apple):
+            return 'banana', apple
+
+        @di.inject('apple', omg='banana')
+        def injected(apple, arg1, omg=None):
+            return apple, arg1, omg
+
+        assert injected('arg1') == (apple(), 'arg1', banana())
+
+    def test_example_inject_classproperty(self, di):
+        @di.register_factory('apple')
+        def apple():
+            return 'apple'
+
+        @di.inject_classproperty('apple')
+        class Injectee(object):
+            pass
+
+        assert Injectee.apple == apple()
+
+    def test_example_auto_inject(self, di):
+        @di.register_factory('apple')
+        def apple():
+            return 'apple'
+
+        @di.auto_inject()
+        def injected(apple):
+            return apple
+
+        assert injected() == apple()
+
+        @di.auto_inject('apple')
+        def injected(apple, arg1):
+            return apple, arg1
+
+        assert injected('arg1') == (apple(), 'arg1')
+
+        @di.register_factory('banana')
+        @di.auto_inject()
+        def banana(apple):
+            return 'banana', apple
+
+        @di.auto_inject()
+        def injected(apple, arg1, banana=None):
+            return apple, arg1, banana
+
+        assert injected('arg1') == (apple(), 'arg1', banana())
