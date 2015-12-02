@@ -37,14 +37,14 @@ class CallableInjector(Injector):
             return cls
 
         if not any([self.args, self.kwargs]):
-            self.injectables = self.di._depends.get(wrapped)
+            self.injectables = self.di.get_deps(wrapped)
         else:
             self.injectables = []
             if self.args:
                 self.injectables.extend(self.args)
             if self.kwargs:
                 self.injectables.extend(self.kwargs.values())
-            self.di._depends.add(wrapped, *self.injectables)
+            self.di.depends_on(*self.injectables)(wrapped)
 
         return self.decorate(wrapped)
 
@@ -53,14 +53,15 @@ class SpecInjector(CallableInjector):
     def decorate(self, wrapped):
         # Remove the number of args from the wrapped function's argspec
         spec = inspect.getargspec(wrapped)
-        new_args = spec.args[len(self.injectables):]
+        new_args = spec.args[len(self.args):]
+        spec.keywords
 
         # Update argspec
         spec = inspect.ArgSpec(new_args, *spec[1:])
 
         @wrapt.decorator(adapter=spec)
         def decorator(wrapped, instance, args, kwargs):
-            injected_args = self.di.resolve(self.injectables)
+            injected_args = list(self.di.iresolve(*self.args))
             injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
 
             if args:
@@ -81,7 +82,8 @@ class AutoSpecInjector(CallableInjector):
             if self.injectables:
                 injectables = self.injectables
             else:
-                injectables = self.di.keys()
+                # TODO This is too much access..
+                injectables = self.di._providers.keys()
 
             injected_args = []
             args_cur_index = 0
@@ -124,7 +126,7 @@ class ClassPropertyInjector(Injector):
         name = self.name or self.key
 
         # Register as dependency for klass
-        self.di._depends.add(klass, self.key)
+        self.di.depends_on(self.key)(klass)
 
         # Add in arguments
         partial = functools.partial(self._wrap_classproperty, klass, self.key, name, self.replace_on_access)
