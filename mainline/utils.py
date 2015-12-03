@@ -3,14 +3,12 @@ import sys
 
 import six
 
+IS_PYPY = '__pypy__' in sys.builtin_module_names
+
 
 def _get_object_init():
-    IS_PYPY = '__pypy__' in sys.builtin_module_names
-    if IS_PYPY or six.PY3:
-        OBJECT_INIT = six.get_unbound_function(object.__init__)
-    else:
-        OBJECT_INIT = None
-    return OBJECT_INIT
+    if six.PY3 or IS_PYPY:
+        return six.get_unbound_function(object.__init__)
 
 
 OBJECT_INIT = _get_object_init()

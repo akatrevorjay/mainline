@@ -100,9 +100,13 @@ class NamespacedProxyScope(ProxyScope):
         return '%s__%s' % (self.namespace, key)
 
 
+SCOPE_FACTORIES = {}
+
+
 class ScopeRegistry(ProxyMutableMapping):
+    _factories = SCOPE_FACTORIES
+
     def __init__(self):
-        self._factories = {}
         super(ScopeRegistry, self).__init__(self._factories)
         self._build()
 
