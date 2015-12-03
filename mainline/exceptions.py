@@ -4,3 +4,7 @@ class DiError(Exception):
 
 class UnresolvableError(DiError):
     pass
+
+
+class UnprovidableError(DiError):
+    pass

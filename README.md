@@ -23,7 +23,8 @@ Examples
 from mainline import DI
 di = Di()
 
-# The default scope is singleton, but you can also use thread, process (really only usable while forking), and any object that supports a MutableMapping interface. 
+# The default scope is singleton, but thread and process are also
+# supported. Any MutableMapping supporting object can also be given.
 @di.register_factory('apple', scope='singleton')
 def apple():
     return 'apple'
@@ -41,7 +42,9 @@ apple = object()
 di.set_instance('apple', apple)
 assert di.resolve('apple') == apple
 
-# If no factory is registered already with this key, one is created using the optional default_scope keyword argument, which defaults to singleton.
+# If no factory is registered already with this key, one is created
+# using the optional default_scope keyword argument, which defaults
+# to singleton.
 banana = object()
 di.set_instance('banana', banana, default_scope='singleton')
 assert di.resolve('banana') == banana

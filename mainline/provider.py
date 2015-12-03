@@ -1,3 +1,7 @@
+from mainline.exceptions import UnprovidableError
+from mainline.scope import ScopeRegistry
+
+
 class IProvider(object):
     def __init__(self):
         pass
@@ -14,6 +18,10 @@ class IProvider(object):
     def set_instance(self, instance):
         raise NotImplementedError
 
+    @property
+    def providable(self):
+        raise NotImplementedError
+
 
 class IFactoryProvider(IProvider):
     def __init__(self, factory=None):
@@ -26,37 +34,25 @@ class IFactoryProvider(IProvider):
         return bool(self.factory)
 
     def provide(self, *args, **kwargs):
+        if not self.providable:
+            raise UnprovidableError(self)
         return self.factory(*args, **kwargs)
 
     def has_instance(self):
         return False
 
-
-class SingletonProvider(IFactoryProvider):
-    name = 'singleton'
-
-    def provide(self, *args, **kwargs):
-        if not self.has_instance():
-            instance = super(SingletonProvider, self).provide(*args, **kwargs)
-            self.set_instance(instance)
-        return self.instance
-
-    def reset(self):
-        if self.has_instance():
-            delattr(self, 'instance')
-
-    def has_instance(self):
-        return hasattr(self, 'instance')
-
-    def set_instance(self, instance):
-        self.instance = instance
+    @property
+    def providable(self):
+        return self.has_instance() or self.has_factory()
 
 
-class ScopeProvider(IFactoryProvider):
-    def __init__(self, scope, factory, key=''):
+class Provider(IFactoryProvider):
+    scopes = ScopeRegistry()
+
+    def __init__(self, factory, scope='singleton', key=''):
         self.key = key
-        self.scope = scope
-        super(ScopeProvider, self).__init__(factory)
+        self.scope = self.scopes.resolve(scope)
+        super(Provider, self).__init__(factory)
 
     def __repr__(self):
         return '<%s factory=%s scope=%s>' % (self.__class__.__name__,
@@ -66,7 +62,7 @@ class ScopeProvider(IFactoryProvider):
     def provide(self, *args, **kwargs):
         if self.has_instance():
             return self.scope[self.key]
-        instance = super(ScopeProvider, self).provide(*args, **kwargs)
+        instance = super(Provider, self).provide(*args, **kwargs)
         self.set_instance(instance)
         return instance
 

@@ -83,7 +83,7 @@ class AutoSpecInjector(CallableInjector):
                 injectables = self.injectables
             else:
                 # TODO This is too much access..
-                injectables = self.di._providers.keys()
+                injectables = self.di.providers.keys()
 
             injected_args = []
             args_cur_index = 0

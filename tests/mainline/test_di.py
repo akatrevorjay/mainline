@@ -1,9 +1,8 @@
 import mock
 import pytest
-
 import itertools
 
-from mainline import Di
+from mainline import Di, Catalog, UnresolvableError, Provider
 
 
 class TestDi(object):
@@ -19,10 +18,10 @@ class TestDi(object):
     def provider_kv(self, di, request):
         key = request.param
         provider = mock.MagicMock(return_value=object())
-        di._providers[key] = provider
+        di.providers[key] = provider
 
         def fin():
-            del di._providers[key]
+            del di.providers[key]
 
         request.addfinalizer(fin)
         return key, provider
@@ -33,14 +32,14 @@ class TestDi(object):
     ).items())
     def dependency_kv(self, di, request):
         key, deps = request.param
-        di._dependencies[key] = deps
+        di.dependencies[key] = deps
         for dep in deps:
-            di._providers[dep] = mock.MagicMock(return_value=object())
+            di.providers[dep] = mock.MagicMock(return_value=object())
 
         def fin():
-            del di._dependencies[key]
+            del di.dependencies[key]
             for dep in deps:
-                del di._providers[dep]
+                del di.providers[dep]
 
         request.addfinalizer(fin)
         return key, deps
@@ -57,11 +56,11 @@ class TestDi(object):
 
     def test_get_provider(self, di, provider_kv):
         key, provider = provider_kv
-        assert di.get_provider(key) is provider
+        assert di.providers[key] is provider
 
     def test_get_provider_404(self, di):
         with pytest.raises(KeyError):
-            di.get_provider('i_dont_exist')
+            di.providers['i_dont_exist']
 
     def test_get_deps(self, di, dependency_kv):
         key, deps = dependency_kv
@@ -70,7 +69,7 @@ class TestDi(object):
     def test_get_missing_deps(self, di):
         key = 'mock_missing_deps'
         deps = ['missing_dep0', 'missing_dep1']
-        di._dependencies[key] = set(deps)
+        di.dependencies[key] = set(deps)
 
         missing = di.get_missing_deps(key)
         assert set(missing) == set(deps)
@@ -85,9 +84,9 @@ class TestDi(object):
         provider.assert_called_with()
 
     def test_resolve_unresolvable(self, di):
-        di._dependencies['missing_deps'] = set(['missing_dep0'])
-        di._providers['missing_deps'] = mock.MagicMock()
-        with pytest.raises(Di.UnresolvableError):
+        di.dependencies['missing_deps'] = set(['missing_dep0'])
+        di.providers['missing_deps'] = mock.MagicMock()
+        with pytest.raises(UnresolvableError):
             di.resolve('missing_deps')
 
     def test_resolve_many(self, di):
@@ -95,7 +94,7 @@ class TestDi(object):
                 mock_provider_uno=mock.MagicMock(return_value=object()),
                 mock_provider_dos=mock.MagicMock(return_value=object()),
         )
-        di._providers.update(providers)
+        di.providers.update(providers)
 
         items = [(k, v.return_value) for k, v in providers.items()]
         assert di.resolve(*[x[0] for x in items]) == [x[1] for x in items]
@@ -246,3 +245,42 @@ class TestDi(object):
             return apple, arg1, banana
 
         assert injected('arg1') == (apple(), 'arg1', banana())
+
+    def test_example_catalog(self, di):
+        class CommonCatalog(Catalog):
+            orange = Provider(lambda: 'orange')
+
+            @di.provider()
+            def apple():
+                return 'apple'
+
+        class TestingCatalog(CommonCatalog):
+            @di.provider(scope='thread')
+            def banana():
+                return 'banana'
+
+        di.update(TestingCatalog)
+
+        @di.inject('apple', 'banana', 'orange')
+        def injected(apple, banana, orange):
+            return apple, banana, orange
+
+        assert injected() == ('apple', 'banana', 'orange')
+
+        class ProductionCatalog(Catalog):
+            @di.provider()
+            def orange():
+                # Not really an orange now is it?
+                return 'not_an_orange'
+
+            @di.provider(scope='thread')
+            def banana():
+                return 'banana'
+
+        di.update(ProductionCatalog)
+
+        @di.inject('apple', 'banana', 'orange')
+        def injected(apple, banana, orange):
+            return apple, banana, orange
+
+        assert injected() == ('apple', 'banana', 'not_an_orange')
