@@ -9,7 +9,7 @@ _sentinel = object()
 
 class ProviderMapping:
     '''
-    Mixin to rovide mapping interface on providers
+    Mixin to provide mapping interface on providers
     '''
 
     def __contains__(self, item):
