@@ -178,6 +178,77 @@ def injected(apple, arg1, banana=None):
 assert injected('arg1') == (apple(), 'arg1', banana())
 ```
 
+### Catalogs
+
+Catalogs provide a declarative way to group together factories.
+
+```py
+class CommonCatalog(Catalog):
+    orange = Provider(lambda: 'orange')
+
+    @di.provider()
+    def apple():
+        return 'apple'
+
+class TestingCatalog(CommonCatalog):
+    @di.provider(scope='thread')
+    def banana():
+        return 'banana'
+
+di.update(TestingCatalog)
+
+@di.inject('apple', 'banana', 'orange')
+def injected(apple, banana, orange):
+    return apple, banana, orange
+
+assert injected() == ('apple', 'banana', 'orange')
+
+class ProductionCatalog(Catalog):
+    @di.provider()
+    def orange():
+        # Not really an orange now is it?
+        return 'not_an_orange'
+
+    @di.provider(scope='thread')
+    def banana():
+        return 'banana'
+
+di.update(ProductionCatalog)
+
+@di.inject('apple', 'banana', 'orange')
+def injected(apple, banana, orange):
+    return apple, banana, orange
+
+assert injected() == ('apple', 'banana', 'not_an_orange')
+```
+
+#### Di as a Catalog
+
+Di supports the ICatalog interface as well, so you can also update Di instances from other Di instances.
+
+```py
+from mainline import Di
+di = Di()
+
+@di.register_factory('apple')
+def apple():
+    return 'apple'
+
+other_di = Di()
+
+@other_di.register_factory('banana')
+def banana():
+    return 'banana'
+
+di.update(other_di)
+
+@di.inject('apple', 'banana')
+def injected(apple, banana):
+    return apple, banana
+
+assert injected() == ('apple', 'banana')
+```
+
 Running tests
 -------------
 

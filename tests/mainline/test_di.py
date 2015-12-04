@@ -284,3 +284,22 @@ class TestDi(object):
             return apple, banana, orange
 
         assert injected() == ('apple', 'banana', 'not_an_orange')
+
+    def test_example_di_as_catalog(self, di):
+        @di.register_factory('apple')
+        def apple():
+            return 'apple'
+
+        other_di = Di()
+
+        @other_di.register_factory('banana')
+        def banana():
+            return 'banana'
+
+        di.update(other_di)
+
+        @di.inject('apple', 'banana')
+        def injected(apple, banana):
+            return apple, banana
+
+        assert injected() == ('apple', 'banana')
