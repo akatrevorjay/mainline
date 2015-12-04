@@ -1,92 +1,71 @@
-import functools
 import inspect
 import six
+import abc
 
-from mainline.provider import IProvider, Provider
+from mainline.utils import ProxyMutableMapping
+from mainline.provider import IProvider
 
 _sentinel = object()
+_provider_mapping_factory = dict
 
 
-class ProviderMapping:
+class ProviderMapping(ProxyMutableMapping):
     '''
     Mixin to provide mapping interface on providers
     '''
 
-    def __contains__(self, item):
-        return item in self.providers
+    _mapping_factory = _provider_mapping_factory
 
-    def __len__(self):
-        return len(self.providers)
+    def __init__(self, *args, **kwargs):
+        if self.__class__._providers:
+            self._providers = self.__class__._providers.copy()
+        else:
+            self._providers = self._mapping_factory()
+        super(ProviderMapping, self).__init__(self._providers)
+        self.update(dict(*args, **kwargs))
 
-    def __iter__(self):
-        return iter(self.providers)
-
-    def __getitem__(self, item):
-        return self.providers[item]
-
-    def __setitem__(self, key, value):
-        self.providers[key] = value
-
-    def __delitem__(self, key):
-        del self.providers[key]
-
-    def keys(self):
-        '''
-        Returns provider keys.
-
-        Primarily here so you can cast to dict, eg dict(di).
-        '''
-        return self.providers.keys()
-
-    def update(self, mapping):
+    def update(self, *args, **kwargs):
         '''
         Updates our providers with either an ICatalog subclass/instance or a mapping.
-        If mapping is an ICatalog subclass, it is instantiated to provide it's mapping interface to update from.
+        If mapping is an ICatalog, we update from it's ._providers attribute.
 
         :param mapping: Mapping to update from.
         :type mapping: ICatalog or Di or collections.Mapping
         '''
-        # If we have an ICatalog subclass, instantiate it to provide a mapping interface.
-        if inspect.isclass(mapping) and issubclass(mapping, ICatalog):
-            mapping = mapping()
-        self.providers.update(mapping)
-
-    @classmethod
-    def provider(cls, factory=_sentinel, scope='singleton'):
-        '''
-        Decorator to create a provider using the given factory, and scope.
-        Can also be used in a non-decorator manner.
-
-        :param scope: Scope key, factory, or instance
-        :type scope: object or callable
-        :return: decorator
-        :rtype: decorator
-        '''
-        if factory is _sentinel:
-            return functools.partial(cls.provider, scope=scope)
-        provider = Provider(factory, scope)
-        return provider
+        # If we only have one argument
+        if len(args) == 1 and not kwargs:
+            # If ths one arg happens to be an ICatalog subclass
+            single_arg = args[0]
+            if inspect.isclass(single_arg) and issubclass(single_arg, ICatalog) or isinstance(single_arg, ICatalog):
+                args = (single_arg._providers,)
+        super(ProviderMapping, self).update(dict(*args, **kwargs))
 
 
-class ICatalog(ProviderMapping, object):
-    pass
+class ICatalog(object):
+    '''
+    Inherit from this class to note that you support the ICatalog interface
+    '''
+
+    _providers = None
 
 
-class CatalogMeta(type):
+class CatalogMeta(abc.ABCMeta):
     '''
     Meta class used to populate providers from attributes of Catalog subclass declarations.
     '''
 
+    _provider_mapping_factory = _provider_mapping_factory
+
     def __new__(mcs, class_name, bases, attributes):
-        cls = type.__new__(mcs, class_name, bases, attributes)
+        cls = super(CatalogMeta, mcs).__new__(mcs, class_name, bases, attributes)
 
         # We may already have providers. If so, make a copy.
-        if hasattr(cls, 'providers'):
-            cls.providers = cls.providers.copy()
+        if cls._providers:
+            cls._providers = cls._providers.copy()
         else:
-            cls.providers = {}
+            cls._providers = mcs._provider_mapping_factory()
 
-        cls.providers.update(
+        cls._providers.update(
                 {k: v for k, v in six.iteritems(attributes)
                  if isinstance(v, IProvider)}
         )
@@ -95,5 +74,5 @@ class CatalogMeta(type):
 
 
 @six.add_metaclass(CatalogMeta)
-class Catalog(ICatalog):
+class Catalog(ICatalog, ProviderMapping):
     pass

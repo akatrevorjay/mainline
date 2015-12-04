@@ -3,9 +3,10 @@ mainline
 
 Simple yet powerful python dependency injection.
 
-Tested with Python 2.7+ (including py3k).
+Tested with Python 2.7, 3.4, 3.5.
 
 [![Test Status](https://circleci.com/gh/vertical-knowledge/mainline.svg?style=svg)](https://circleci.com/gh/vertical-knowledge/mainline) [![Coverage Status](https://coveralls.io/repos/vertical-knowledge/mainline/badge.svg?branch=develop&service=github)](https://coveralls.io/github/vertical-knowledge/mainline?branch=develop) [![Documentation Status](https://readthedocs.org/projects/mainline/badge/?version=latest)](http://mainline.readthedocs.org/en/latest/?badge=latest)
+
 
 Installation
 ------------
@@ -20,7 +21,7 @@ Examples
 ### Simple factory registration and resolution of an instance
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 # The default scope is singleton, but thread and process are also
@@ -35,7 +36,7 @@ assert di.resolve('apple') == 'apple'
 ### Simple instance registration
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 apple = object()
@@ -53,7 +54,7 @@ assert di.resolve('banana') == banana
 ### Injection of positional and keyword arguments
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
@@ -127,7 +128,7 @@ assert Injectee().apple == apple()
 ### Injection as a classproperty
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
@@ -146,7 +147,7 @@ assert Injectee.apple == apple()
 Do yourself a favor and use this sparingly. The magic on this one is real.
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
@@ -175,6 +176,77 @@ def injected(apple, arg1, banana=None):
     return apple, arg1, banana
 
 assert injected('arg1') == (apple(), 'arg1', banana())
+```
+
+### Catalogs
+
+Catalogs provide a declarative way to group together factories.
+
+```py
+class CommonCatalog(Catalog):
+    orange = Provider(lambda: 'orange')
+
+    @di.provider()
+    def apple():
+        return 'apple'
+
+class TestingCatalog(CommonCatalog):
+    @di.provider(scope='thread')
+    def banana():
+        return 'banana'
+
+di.update(TestingCatalog)
+
+@di.inject('apple', 'banana', 'orange')
+def injected(apple, banana, orange):
+    return apple, banana, orange
+
+assert injected() == ('apple', 'banana', 'orange')
+
+class ProductionCatalog(Catalog):
+    @di.provider()
+    def orange():
+        # Not really an orange now is it?
+        return 'not_an_orange'
+
+    @di.provider(scope='thread')
+    def banana():
+        return 'banana'
+
+di.update(ProductionCatalog)
+
+@di.inject('apple', 'banana', 'orange')
+def injected(apple, banana, orange):
+    return apple, banana, orange
+
+assert injected() == ('apple', 'banana', 'not_an_orange')
+```
+
+#### Di as a Catalog
+
+Di supports the ICatalog interface as well, so you can also update Di instances from other Di instances.
+
+```py
+from mainline import Di
+di = Di()
+
+@di.register_factory('apple')
+def apple():
+    return 'apple'
+
+other_di = Di()
+
+@other_di.register_factory('banana')
+def banana():
+    return 'banana'
+
+di.update(other_di)
+
+@di.inject('apple', 'banana')
+def injected(apple, banana):
+    return apple, banana
+
+assert injected() == ('apple', 'banana')
 ```
 
 Running tests

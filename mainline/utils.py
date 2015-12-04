@@ -26,7 +26,7 @@ class ProxyMutableMapping(collections.MutableMapping):
     def __init__(self, mapping):
         self.__mapping = mapping
 
-    _fancy_repr = False
+    _fancy_repr = True
 
     def __repr__(self):
         if self._fancy_repr:
