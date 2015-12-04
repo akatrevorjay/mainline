@@ -10,6 +10,9 @@ _sentinel = object()
 
 
 class Di(ICatalog):
+    '''
+    Dependency injection container.
+    '''
     scopes = ScopeRegistry()
 
     def __init__(self, providers_factory=Catalog, dependencies_factory=dict):
