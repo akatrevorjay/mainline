@@ -20,7 +20,7 @@ Examples
 ### Simple factory registration and resolution of an instance
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 # The default scope is singleton, but thread and process are also
@@ -35,7 +35,7 @@ assert di.resolve('apple') == 'apple'
 ### Simple instance registration
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 apple = object()
@@ -53,7 +53,7 @@ assert di.resolve('banana') == banana
 ### Injection of positional and keyword arguments
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
@@ -127,7 +127,7 @@ assert Injectee().apple == apple()
 ### Injection as a classproperty
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
@@ -146,7 +146,7 @@ assert Injectee.apple == apple()
 Do yourself a favor and use this sparingly. The magic on this one is real.
 
 ```py
-from mainline import DI
+from mainline import Di
 di = Di()
 
 @di.register_factory('apple')
