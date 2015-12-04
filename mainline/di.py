@@ -1,19 +1,49 @@
 import functools
 
-from mainline.catalog import ICatalog
+from mainline.catalog import ICatalog, Catalog
 from mainline.exceptions import UnresolvableError
 from mainline.injection import ClassPropertyInjector, AutoSpecInjector, SpecInjector
 from mainline.scope import ScopeRegistry
+from mainline.provider import provider_factory
 
 _sentinel = object()
 
 
-class Di(ICatalog, object):
+class Di(ICatalog):
     scopes = ScopeRegistry()
 
-    def __init__(self, providers_factory=dict, dependencies_factory=dict):
-        self.providers = providers_factory()
-        self.dependencies = dependencies_factory()
+    def __init__(self, providers_factory=Catalog, dependencies_factory=dict):
+        self._providers = providers_factory()
+        self._dependencies = dependencies_factory()
+        super(Di, self).__init__()
+
+    @property
+    def providers(self):
+        '''
+        Public attribute for provider mapping
+        '''
+        return self._providers
+
+    @property
+    def dependencies(self):
+        '''
+        Public attributes for dependency mapping
+        '''
+        return self._dependencies
+
+    def update(self, catalog=None, dependencies=None):
+        '''
+        Convenience method to update this Di instance with the specified contents.
+
+        :param catalog: ICatalog supporting class or mapping
+        :type catalog: ICatalog or collections.Mapping
+        :param dependencies: Mapping of dependencies
+        :type dependencies: collections.Mapping
+        '''
+        if catalog:
+            self._providers.update(catalog)
+        if dependencies:
+            self._dependencies.update(dependencies)
 
     def get_deps(self, obj):
         '''
@@ -24,7 +54,7 @@ class Di(ICatalog, object):
         :return: Dependencies
         :rtype: set
         '''
-        return self.dependencies.get(obj, set())
+        return self._dependencies.get(obj, set())
 
     def get_missing_deps(self, obj):
         '''
@@ -39,7 +69,7 @@ class Di(ICatalog, object):
         deps = self.get_deps(obj)
         ret = []
         for key in deps:
-            provider = self.providers.get(key)
+            provider = self._providers.get(key)
             if provider and provider.providable:
                 continue
             ret.append(key)
@@ -59,7 +89,7 @@ class Di(ICatalog, object):
             if missing:
                 raise UnresolvableError("Missing dependencies for %s: %s" % (key, missing))
 
-            provider = self.providers.get(key)
+            provider = self._providers.get(key)
             if not provider:
                 raise UnresolvableError("Provider does not exist for %s" % key)
 
@@ -93,6 +123,9 @@ class Di(ICatalog, object):
         deps = self.get_deps(obj)
         return list(self.iresolve(*deps))
 
+    # Hook this in for usability
+    provider = staticmethod(provider_factory)
+
     def register_factory(self, key, factory=_sentinel, scope='singleton'):
         '''
         Creates and registers a provider using the given key, factory, and scope.
@@ -109,10 +142,10 @@ class Di(ICatalog, object):
         '''
         if factory is _sentinel:
             return functools.partial(self.register_factory, key, scope=scope)
-        if key in self.providers:
+        if key in self._providers:
             raise KeyError("Key %s already exists" % key)
         provider = self.provider(factory, scope)
-        self.providers[key] = provider
+        self._providers[key] = provider
         return factory
 
     def set_instance(self, key, instance, default_scope='singleton'):
@@ -126,11 +159,11 @@ class Di(ICatalog, object):
         :param default_scope: Scope key, factory, or instance
         :type default_scope: object or callable
         '''
-        if key not in self.providers:
+        if key not in self._providers:
             # We don't know how to create this kind of instance at this time, so add it without a factory.
             factory = None
             self.register_factory(key, factory, default_scope)
-        self.providers[key].set_instance(instance)
+        self._providers[key].set_instance(instance)
 
     def depends_on(self, *keys):
         '''
@@ -144,9 +177,9 @@ class Di(ICatalog, object):
 
         def decorator(wrapped):
             if keys:
-                if wrapped not in self.dependencies:
-                    self.dependencies[wrapped] = set()
-                self.dependencies[wrapped].update(keys)
+                if wrapped not in self._dependencies:
+                    self._dependencies[wrapped] = set()
+                self._dependencies[wrapped].update(keys)
             return wrapped
 
         return decorator

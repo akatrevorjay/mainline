@@ -1,5 +1,9 @@
+import functools
+
 from mainline.exceptions import UnprovidableError
 from mainline.scope import ScopeRegistry
+
+_sentinel = object()
 
 
 class IProvider(object):
@@ -71,3 +75,19 @@ class Provider(IFactoryProvider):
 
     def set_instance(self, instance):
         self.scope[self.key] = instance
+
+
+def provider_factory(factory=_sentinel, scope='singleton'):
+    '''
+    Decorator to create a provider using the given factory, and scope.
+    Can also be used in a non-decorator manner.
+
+    :param scope: Scope key, factory, or instance
+    :type scope: object or callable
+    :return: decorator
+    :rtype: decorator
+    '''
+    if factory is _sentinel:
+        return functools.partial(provider_factory, scope=scope)
+    provider = Provider(factory, scope)
+    return provider
