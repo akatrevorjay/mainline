@@ -13,7 +13,7 @@ Contents:
 
    mainline.rst
 
-.. include:: intro.md
+.. include:: README.rst
 
 
 Indices and tables
