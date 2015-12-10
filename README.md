@@ -21,12 +21,12 @@ Examples
 ### Simple factory registration and resolution of an instance
 
 ```py
-from mainline import Di
+from mainline import Di, GlobalScope
 di = Di()
 
-# The default scope is singleton, but thread and process are also
+# The default scope is global, but thread and process are also
 # supported. Any MutableMapping supporting object can also be given.
-@di.register_factory('apple', scope='singleton')
+@di.register_factory('apple', scope=GlobalScope)
 def apple():
     return 'apple'
 
@@ -36,18 +36,17 @@ assert di.resolve('apple') == 'apple'
 ### Simple instance registration
 
 ```py
-from mainline import Di
+from mainline import Di, GlobalScope
 di = Di()
 
 apple = object()
-di.set_instance('apple', apple)
+di.register_instance('apple', apple)
 assert di.resolve('apple') == apple
 
 # If no factory is registered already with this key, one is created
-# using the optional default_scope keyword argument, which defaults
-# to singleton.
+# using the optional scope keyword argument
 banana = object()
-di.set_instance('banana', banana, default_scope='singleton')
+di.register_instance('banana', banana, scope=GlobalScope)
 assert di.resolve('banana') == banana
 ```
 
@@ -103,7 +102,7 @@ class Test(object):
     pass
 
 # Thread scopes are stored in a thread local
-@di.register_factory(Test, scope='thread')
+@di.register_factory(Test, scope=ThreadScope)
 def test_factory():
     return Test()
 
@@ -191,7 +190,7 @@ class CommonCatalog(Catalog):
         return 'apple'
 
 class TestingCatalog(CommonCatalog):
-    @di.provider(scope='thread')
+    @di.provider(scope=ThreadScope)
     def banana():
         return 'banana'
 
@@ -209,7 +208,7 @@ class ProductionCatalog(Catalog):
         # Not really an orange now is it?
         return 'not_an_orange'
 
-    @di.provider(scope='thread')
+    @di.provider(scope=ThreadScope)
     def banana():
         return 'banana'
 

@@ -46,9 +46,17 @@ class IScope(ProxyMutableMapping):
         super(IScope, self).__delitem__(key)
 
 
-class SingletonScope(IScope):
+class NoneScope(IScope):
     register = True
-    name = 'singleton'
+    name = 'none'
+
+    def __setitem__(self, key, value):
+        return
+
+
+class GlobalScope(IScope):
+    register = True
+    name = 'global'
 
 
 class ProcessScope(IScope):
@@ -71,14 +79,6 @@ class ThreadScope(IScope):
         if not hasattr(self._thread_local, 'instances'):
             self._thread_local.instances = dict()
         return self._thread_local.instances
-
-
-class NoneScope(IScope):
-    register = True
-    name = 'none'
-
-    def __setitem__(self, key, value):
-        return
 
 
 class ProxyScope(IScope):

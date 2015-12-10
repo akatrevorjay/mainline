@@ -3,7 +3,7 @@ import functools
 from mainline.catalog import ICatalog, Catalog
 from mainline.exceptions import UnresolvableError
 from mainline.injection import ClassPropertyInjector, AutoSpecInjector, SpecInjector
-from mainline.scope import ScopeRegistry
+from mainline.scope import ScopeRegistry, NoneScope, GlobalScope
 from mainline.provider import provider_factory
 
 _sentinel = object()
@@ -129,7 +129,7 @@ class Di(ICatalog):
     # Hook this in for usability
     provider = staticmethod(provider_factory)
 
-    def register_factory(self, key, factory=_sentinel, scope='singleton'):
+    def register_factory(self, key, factory=_sentinel, scope=NoneScope):
         '''
         Creates and registers a provider using the given key, factory, and scope.
         Can also be used as a decorator.
@@ -151,22 +151,22 @@ class Di(ICatalog):
         self._providers[key] = provider
         return factory
 
-    def set_instance(self, key, instance, default_scope='singleton'):
+    def register_instance(self, key, instance, scope=GlobalScope):
         '''
-        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given default_scope.
+        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given scope.
 
         :param key: Provider key
         :type key: object
         :param instance: Instance
         :type instance: object
-        :param default_scope: Scope key, factory, or instance
-        :type default_scope: object or callable
+        :param scope: Scope key, factory, or instance
+        :type scope: object or callable
         '''
         if key not in self._providers:
             # We don't know how to create this kind of instance at this time, so add it without a factory.
             factory = None
-            self.register_factory(key, factory, default_scope)
-        self._providers[key].set_instance(instance)
+            self.register_factory(key, factory, scope)
+        self._providers[key].register_instance(instance)
 
     def depends_on(self, *keys):
         '''

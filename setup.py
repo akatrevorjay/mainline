@@ -24,8 +24,8 @@ conf = dict(
 
     install_requires=[
         'wrapt',
+        'six'
     ],
-
     setup_requires=[],
     tests_require=parse_requirements('test_requirements.txt'),
 )
