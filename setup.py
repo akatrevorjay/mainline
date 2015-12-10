@@ -27,7 +27,7 @@ conf = dict(
     ],
 
     setup_requires=[],
-    tests_require=parse_requirements('test_requirements.txt'),
+    tests_require=parse_requirements('requirements/test.txt'),
 )
 
 conf['download_url'] = '{url}/tarball/{version}'.format(**conf)
