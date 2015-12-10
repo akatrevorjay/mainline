@@ -153,7 +153,8 @@ class Di(ICatalog):
 
     def set_instance(self, key, instance, default_scope=GlobalScope):
         '''
-        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given scope.
+        Sets instance under specified provider key. If a provider for specified key does not exist, one is created
+        without a factory using the given scope.
 
         :param key: Provider key
         :type key: object
@@ -204,7 +205,8 @@ class Di(ICatalog):
 
     def inject(self, *args, **kwargs):
         '''
-        Decorator that injects the specified arguments when the wrapped is called. Argspec is modified on the wrapped accordingly.
+        Decorator that injects the specified arguments when the wrapped is called. Argspec is modified on the wrapped
+        accordingly.
 
         Positional arguments are injected in the order they are given.
 
@@ -223,7 +225,8 @@ class Di(ICatalog):
 
     def auto_inject(self, *args, **kwargs):
         '''
-        Decorator that magically inspects the argspec of the wrapped upon call, injecting provider instances as names match. It's recommended to use inject() where possible and not this heap of black magic.
+        Decorator that magically inspects the argspec of the wrapped upon call, injecting provider instances as names
+        match. It's recommended to use inject() where possible and not this heap of black magic.
 
         Positional arguments are added as dependencies to wrapped.
 
