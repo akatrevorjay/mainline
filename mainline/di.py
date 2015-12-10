@@ -34,7 +34,7 @@ class Di(ICatalog):
         '''
         return self._dependencies
 
-    def update(self, catalog=None, dependencies=None):
+    def update(self, catalog=None, dependencies=None, allow_overwrite=False):
         '''
         Convenience method to update this Di instance with the specified contents.
 
@@ -44,7 +44,7 @@ class Di(ICatalog):
         :type dependencies: collections.Mapping
         '''
         if catalog:
-            self._providers.update(catalog)
+            self._providers.update(catalog, allow_overwrite=allow_overwrite)
         if dependencies:
             self._dependencies.update(dependencies)
 
