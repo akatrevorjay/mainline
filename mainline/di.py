@@ -129,7 +129,7 @@ class Di(ICatalog):
     # Hook this in for usability
     provider = staticmethod(provider_factory)
 
-    def register_factory(self, key, factory=_sentinel, scope=NoneScope):
+    def register_factory(self, key, factory=_sentinel, scope=NoneScope, allow_overwrite=False):
         '''
         Creates and registers a provider using the given key, factory, and scope.
         Can also be used as a decorator.
@@ -145,7 +145,7 @@ class Di(ICatalog):
         '''
         if factory is _sentinel:
             return functools.partial(self.register_factory, key, scope=scope)
-        if key in self._providers:
+        if not allow_overwrite and key in self._providers:
             raise KeyError("Key %s already exists" % key)
         provider = self.provider(factory, scope)
         self._providers[key] = provider

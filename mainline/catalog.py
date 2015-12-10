@@ -24,21 +24,22 @@ class ProviderMapping(ProxyMutableMapping):
         super(ProviderMapping, self).__init__(self._providers)
         self.update(dict(*args, **kwargs))
 
-    def update(self, *args, **kwargs):
+    def update(self, arg, allow_overwrite=False):
         '''
-        Updates our providers with either an ICatalog subclass/instance or a mapping.
-        If mapping is an ICatalog, we update from it's ._providers attribute.
+        Updates our providers from either an ICatalog subclass/instance or a mapping.
+        If arg is an ICatalog, we update from it's ._providers attribute.
 
-        :param mapping: Mapping to update from.
-        :type mapping: ICatalog or Di or collections.Mapping
+        :param arg: Di/Catalog/Mapping to update from.
+        :type arg: ICatalog or collections.Mapping
         '''
-        # If we only have one argument
-        if len(args) == 1 and not kwargs:
-            # If ths one arg happens to be an ICatalog subclass
-            single_arg = args[0]
-            if inspect.isclass(single_arg) and issubclass(single_arg, ICatalog) or isinstance(single_arg, ICatalog):
-                args = (single_arg._providers,)
-        super(ProviderMapping, self).update(dict(*args, **kwargs))
+        # If arg happens to be an ICatalog subclass
+        if inspect.isclass(arg) and issubclass(arg, ICatalog) or isinstance(arg, ICatalog):
+            arg = arg._providers
+        if not allow_overwrite:
+            for key in arg:
+                if key in self._providers:
+                    raise KeyError("Key %s already exists" % key)
+        super(ProviderMapping, self).update(arg)
 
 
 class ICatalog(object):
