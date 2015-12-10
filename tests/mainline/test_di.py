@@ -2,7 +2,7 @@ import mock
 import pytest
 import itertools
 
-from mainline import Di, Catalog, UnresolvableError, Provider
+from mainline import Di, Catalog, UnresolvableError, Provider, GlobalScope
 
 
 class TestDi(object):
@@ -134,9 +134,9 @@ class TestDi(object):
         di.set_instance('apple', apple)
         assert di.resolve('apple') == apple
 
-        # If no factory is registered already with this key, one is created using the optional default_scope keyword argument, which defaults to singleton.
+        # If no factory is registered already with this key, one is created using the optional scope keyword argument.
         banana = object()
-        di.set_instance('banana', banana, default_scope='singleton')
+        di.set_instance('banana', banana, default_scope=GlobalScope)
         assert di.resolve('banana') == banana
 
     def test_example_inject(self, di):

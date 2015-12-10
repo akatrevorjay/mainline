@@ -21,6 +21,20 @@ Examples
 Simple factory registration and resolution of an instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+When registering a factory, you can specify a scope. The factory provided will be called to construct an instance once in the scope provided.
+After that, the already constructed product of the factory will be injected for all calls to Di.inject with the registered key in the specified scope.
+
+For example:
+- A factory registered with a NoneScope will construct an instance every time Di.inject is called with the registered key.
+- A factory registered with a GlobalScope will construct one instance ever.
+- A factory registered with a Process scope will generate an instance once per process.
+- A factory registered with a Thread scope will generate an instance once per thread.
+
+Scopes available by default for factory registration are: GlobalScope (SingletonScope), ThreadScope, ProcessScope and NoneScope.
+However, you may provide your own custom scopes as well.
+
+Scopes can be passed to register_factory as mainline scope objects, or as strings (e.g. NoneScope or 'none', GlobalScope or 'global').
+
 .. testcode:: py
 
     from mainline import Di

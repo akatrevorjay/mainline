@@ -3,7 +3,7 @@ import functools
 from mainline.catalog import ICatalog, Catalog
 from mainline.exceptions import UnresolvableError
 from mainline.injection import ClassPropertyInjector, AutoSpecInjector, SpecInjector
-from mainline.scope import ScopeRegistry
+from mainline.scope import ScopeRegistry, NoneScope, GlobalScope
 from mainline.provider import provider_factory
 
 _sentinel = object()
@@ -129,7 +129,7 @@ class Di(ICatalog):
     # Hook this in for usability
     provider = staticmethod(provider_factory)
 
-    def register_factory(self, key, factory=_sentinel, scope='singleton'):
+    def register_factory(self, key, factory=_sentinel, scope=NoneScope):
         '''
         Creates and registers a provider using the given key, factory, and scope.
         Can also be used as a decorator.
@@ -151,9 +151,9 @@ class Di(ICatalog):
         self._providers[key] = provider
         return factory
 
-    def set_instance(self, key, instance, default_scope='singleton'):
+    def set_instance(self, key, instance, default_scope=GlobalScope):
         '''
-        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given default_scope.
+        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given scope.
 
         :param key: Provider key
         :type key: object
