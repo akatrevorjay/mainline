@@ -17,6 +17,7 @@ Installation
 Examples
 --------
 
+
 Simple factory registration and resolution of an instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -32,6 +33,7 @@ Simple factory registration and resolution of an instance
         return 'apple'
 
     assert di.resolve('apple') == 'apple'
+
 
 Simple instance registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,6 +53,83 @@ Simple instance registration
     banana = object()
     di.set_instance('banana', banana, default_scope='singleton')
     assert di.resolve('banana') == banana
+
+
+Catalogs
+~~~~~~~~
+
+Catalogs provide a declarative way to group together factories.
+
+.. code:: py
+
+    class CommonCatalog(Catalog):
+        orange = Provider(lambda: 'orange')
+
+        @di.provider()
+        def apple():
+            return 'apple'
+
+    class TestingCatalog(CommonCatalog):
+        @di.provider(scope='thread')
+        def banana():
+            return 'banana'
+
+    di.update(TestingCatalog)
+
+    @di.inject('apple', 'banana', 'orange')
+    def injected(apple, banana, orange):
+        return apple, banana, orange
+
+    assert injected() == ('apple', 'banana', 'orange')
+
+    class ProductionCatalog(Catalog):
+        @di.provider()
+        def orange():
+            # Not really an orange now is it?
+            return 'not_an_orange'
+
+        @di.provider(scope='thread')
+        def banana():
+            return 'banana'
+
+    di.update(ProductionCatalog)
+
+    @di.inject('apple', 'banana', 'orange')
+    def injected(apple, banana, orange):
+        return apple, banana, orange
+
+    assert injected() == ('apple', 'banana', 'not_an_orange')
+
+
+Di as a Catalog
+^^^^^^^^^^^^^^^
+
+Di supports the ICatalog interface as well, so you can also update Di
+instances from other Di instances.
+
+.. code:: py
+
+    from mainline import Di
+    di = Di()
+
+    @di.register_factory('apple')
+    def apple():
+        return 'apple'
+
+    other_di = Di()
+
+    @other_di.register_factory('banana')
+    def banana():
+        return 'banana'
+
+    di.update(other_di)
+
+    @di.inject('apple', 'banana')
+    def injected(apple, banana):
+        return apple, banana
+
+    assert injected() == ('apple', 'banana')
+
 
 Injection of positional and keyword arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,6 +206,7 @@ Injection of positional and keyword arguments
 
     assert Injectee().apple == apple()
 
+
 Injection as a classproperty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -144,6 +224,7 @@ Injection as a classproperty
         pass
 
     assert Injectee.apple == apple()
+
 
 Auto injection based on name in argspec
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,79 +264,6 @@ real.
 
     assert injected('arg1') == (apple(), 'arg1', banana())
 
-Catalogs
-~~~~~~~~
-
-Catalogs provide a declarative way to group together factories.
-
-.. code:: py
-
-    class CommonCatalog(Catalog):
-        orange = Provider(lambda: 'orange')
-
-        @di.provider()
-        def apple():
-            return 'apple'
-
-    class TestingCatalog(CommonCatalog):
-        @di.provider(scope='thread')
-        def banana():
-            return 'banana'
-
-    di.update(TestingCatalog)
-
-    @di.inject('apple', 'banana', 'orange')
-    def injected(apple, banana, orange):
-        return apple, banana, orange
-
-    assert injected() == ('apple', 'banana', 'orange')
-
-    class ProductionCatalog(Catalog):
-        @di.provider()
-        def orange():
-            # Not really an orange now is it?
-            return 'not_an_orange'
-
-        @di.provider(scope='thread')
-        def banana():
-            return 'banana'
-
-    di.update(ProductionCatalog)
-
-    @di.inject('apple', 'banana', 'orange')
-    def injected(apple, banana, orange):
-        return apple, banana, orange
-
-    assert injected() == ('apple', 'banana', 'not_an_orange')
-
-Di as a Catalog
-^^^^^^^^^^^^^^^
-
-Di supports the ICatalog interface as well, so you can also update Di
-instances from other Di instances.
-
-.. code:: py
-
-    from mainline import Di
-    di = Di()
-
-    @di.register_factory('apple')
-    def apple():
-        return 'apple'
-
-    other_di = Di()
-
-    @other_di.register_factory('banana')
-    def banana():
-        return 'banana'
-
-    di.update(other_di)
-
-    @di.inject('apple', 'banana')
-    def injected(apple, banana):
-        return apple, banana
-
-    assert injected() == ('apple', 'banana')
 
 Running tests
 -------------
