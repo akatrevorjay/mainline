@@ -21,7 +21,7 @@ Examples
 Simple factory registration and resolution of an instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
@@ -38,7 +38,7 @@ Simple factory registration and resolution of an instance
 Simple instance registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
@@ -60,7 +60,7 @@ Catalogs
 
 Catalogs provide a declarative way to group together factories.
 
-.. code:: py
+.. testcode:: py
 
     class CommonCatalog(Catalog):
         orange = Provider(lambda: 'orange')
@@ -107,7 +107,7 @@ Di as a Catalog
 Di supports the ICatalog interface as well, so you can also update Di
 instances from other Di instances.
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
@@ -134,7 +134,7 @@ instances from other Di instances.
 Injection of positional and keyword arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
@@ -210,7 +210,7 @@ Injection of positional and keyword arguments
 Injection as a classproperty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
@@ -232,7 +232,7 @@ Auto injection based on name in argspec
 Do yourself a favor and use this sparingly. The magic on this one is
 real.
 
-.. code:: py
+.. testcode:: py
 
     from mainline import Di
     di = Di()
