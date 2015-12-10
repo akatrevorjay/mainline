@@ -41,9 +41,10 @@ Scopes can be passed to register_factory as mainline scope objects, or as string
     from mainline import Di
     di = Di()
 
-    # The default scope is singleton, but thread and process are also
-    # supported. Any MutableMapping supporting object can also be given.
-    @di.register_factory('apple', scope='singleton')
+    # The default scope is NoneScope, which means a new instance is created every time.
+    # See above for the list of scopes and their names.
+    # Any MutableMapping supporting object can also be given.
+    @di.register_factory('apple', scope='global')
     def apple():
         return 'apple'
 
@@ -64,9 +65,9 @@ Simple instance registration
 
     # If no factory is registered already with this key, one is created
     # using the optional default_scope keyword argument, which defaults
-    # to singleton.
+    # to global.
     banana = object()
-    di.set_instance('banana', banana, default_scope='singleton')
+    di.set_instance('banana', banana, default_scope='none')
     assert di.resolve('banana') == banana
 
 
@@ -76,13 +77,17 @@ Catalogs
 Catalogs provide a declarative way to group together factories.
 
 .. code:: py
+    from mainline import Di
+    di = Di()
 
-    class CommonCatalog(Catalog):
-        orange = Provider(lambda: 'orange')
-
-        @di.provider()
+    class CommonCatalog(di.Catalog):
+        # The di.provide() decorator/callable is a Provider factory.
+        @di.provide(scope='thread')
         def apple():
             return 'apple'
+
+        # You can also give it a Provider object directly, but this is a bit silly.
+        orange = di.Provider(lambda: 'orange')
 
     class TestingCatalog(CommonCatalog):
         @di.provider(scope='thread')
@@ -97,7 +102,7 @@ Catalogs provide a declarative way to group together factories.
 
     assert injected() == ('apple', 'banana', 'orange')
 
-    class ProductionCatalog(Catalog):
+    class ProductionCatalog(di.Catalog):
         @di.provider()
         def orange():
             # Not really an orange now is it?
