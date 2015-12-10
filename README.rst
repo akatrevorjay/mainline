@@ -36,7 +36,7 @@ However, you may provide your own custom scopes as well.
 
 Scopes can be passed to register_factory as mainline scope objects, or as strings (e.g. NoneScope or 'none', GlobalScope or 'global').
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
@@ -53,7 +53,7 @@ Scopes can be passed to register_factory as mainline scope objects, or as string
 Simple instance registration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
@@ -75,7 +75,7 @@ Catalogs
 
 Catalogs provide a declarative way to group together factories.
 
-.. testcode:: py
+.. code:: py
 
     class CommonCatalog(Catalog):
         orange = Provider(lambda: 'orange')
@@ -122,7 +122,7 @@ Di as a Catalog
 Di supports the ICatalog interface as well, so you can also update Di
 instances from other Di instances.
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
@@ -149,7 +149,7 @@ instances from other Di instances.
 Injection of positional and keyword arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
@@ -225,7 +225,7 @@ Injection of positional and keyword arguments
 Injection as a classproperty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
@@ -247,7 +247,7 @@ Auto injection based on name in argspec
 Do yourself a favor and use this sparingly. The magic on this one is
 real.
 
-.. testcode:: py
+.. code:: py
 
     from mainline import Di
     di = Di()
