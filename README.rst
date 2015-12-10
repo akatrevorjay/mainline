@@ -25,6 +25,7 @@ When registering a factory, you can specify a scope. The factory provided will b
 After that, the already constructed product of the factory will be injected for all calls to Di.inject with the registered key in the specified scope.
 
 For example:
+
 - A factory registered with a NoneScope will construct an instance every time Di.inject is called with the registered key.
 - A factory registered with a GlobalScope will construct one instance ever.
 - A factory registered with a Process scope will generate an instance once per process.
