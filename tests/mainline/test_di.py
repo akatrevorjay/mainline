@@ -136,7 +136,7 @@ class TestDi(object):
 
         # If no factory is registered already with this key, one is created using the optional scope keyword argument.
         banana = object()
-        di.register_instance('banana', banana, scope=GlobalScope)
+        di.register_instance('banana', banana, default_scope=GlobalScope)
         assert di.resolve('banana') == banana
 
     def test_example_inject(self, di):

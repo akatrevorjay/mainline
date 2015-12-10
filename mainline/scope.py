@@ -59,6 +59,11 @@ class GlobalScope(IScope):
     name = 'global'
 
 
+class SingletonScope(GlobalScope):
+    """ Alias for GlobalScope
+    """
+
+
 class ProcessScope(IScope):
     register = True
     name = 'process'

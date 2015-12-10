@@ -15,18 +15,33 @@ Installation
 pip install mainline
 ```
 
+
 Examples
 --------
 
 ### Simple factory registration and resolution of an instance
 
+When registering a factory, you can specify a scope. The factory provided will be called to construct an instance once in the scope provided.
+After that, the already constructed product of the factory will be injected for all calls to Di.inject with the registered key in the specified scope.
+
+For example:
+- A factory registered with a NoneScope will construct an instance every time Di.inject is called with the registered key.
+- A factory registered with a GlobalScope will construct one instance ever.
+- A factory registered with a Process scope will generate an instance once per process.
+- A factory registered with a Thread scope will generate an instance once per thread.
+
+Scopes available by default for factory registration are: GlobalScope (SingletonScope), ThreadScope, ProcessScope and NoneScope.
+However, you may provide your own custom scopes as well.
+
+Scopes can be passed to register_factory as mainline scope objects, or as strings (e.g. NoneScope or 'none', GlobalScope or 'global').
+
+
 ```py
-from mainline import Di, GlobalScope
+from mainline import Di
 di = Di()
 
-# The default scope is global, but thread and process are also
-# supported. Any MutableMapping supporting object can also be given.
-@di.register_factory('apple', scope=GlobalScope)
+# The default scope is NoneScope, but global (singleton), thread, process or any MutableMapping supporting object can also be given.
+@di.register_factory('apple', scope='global')
 def apple():
     return 'apple'
 
@@ -44,9 +59,9 @@ di.register_instance('apple', apple)
 assert di.resolve('apple') == apple
 
 # If no factory is registered already with this key, one is created
-# using the optional scope keyword argument
+# using the optional default_scope keyword argument
 banana = object()
-di.register_instance('banana', banana, scope=GlobalScope)
+di.register_instance('banana', banana, default_scope=GlobalScope)
 assert di.resolve('banana') == banana
 ```
 
@@ -102,7 +117,7 @@ class Test(object):
     pass
 
 # Thread scopes are stored in a thread local
-@di.register_factory(Test, scope=ThreadScope)
+@di.register_factory(Test, scope='thread')
 def test_factory():
     return Test()
 
@@ -190,7 +205,7 @@ class CommonCatalog(Catalog):
         return 'apple'
 
 class TestingCatalog(CommonCatalog):
-    @di.provider(scope=ThreadScope)
+    @di.provider(scope='thread')
     def banana():
         return 'banana'
 
@@ -208,7 +223,7 @@ class ProductionCatalog(Catalog):
         # Not really an orange now is it?
         return 'not_an_orange'
 
-    @di.provider(scope=ThreadScope)
+    @di.provider(scope='thread')
     def banana():
         return 'banana'
 
