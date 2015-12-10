@@ -55,13 +55,13 @@ from mainline import Di, GlobalScope
 di = Di()
 
 apple = object()
-di.register_instance('apple', apple)
+di.set_instance('apple', apple)
 assert di.resolve('apple') == apple
 
 # If no factory is registered already with this key, one is created
 # using the optional default_scope keyword argument
 banana = object()
-di.register_instance('banana', banana, default_scope=GlobalScope)
+di.set_instance('banana', banana, default_scope=GlobalScope)
 assert di.resolve('banana') == banana
 ```
 

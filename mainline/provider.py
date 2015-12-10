@@ -18,7 +18,7 @@ class IProvider(object):
     def has_instance(self):
         raise NotImplementedError
 
-    def register_instance(self, instance):
+    def set_instance(self, instance):
         raise NotImplementedError
 
     @property
@@ -66,13 +66,13 @@ class Provider(IFactoryProvider):
         if self.has_instance():
             return self.scope[self.key]
         instance = super(Provider, self).provide(*args, **kwargs)
-        self.register_instance(instance)
+        self.set_instance(instance)
         return instance
 
     def has_instance(self):
         return self.key in self.scope
 
-    def register_instance(self, instance):
+    def set_instance(self, instance):
         self.scope[self.key] = instance
 
 

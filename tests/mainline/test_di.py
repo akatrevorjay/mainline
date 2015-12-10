@@ -47,12 +47,12 @@ class TestDi(object):
     def test_assert_test_env(self, di):
         assert self.all_scopeish
 
-    def test_register_instance(self, di, provider_kv):
+    def test_set_instance(self, di, provider_kv):
         key, provider = provider_kv
 
         instance = mock.MagicMock()
-        di.register_instance(key, instance)
-        provider.register_instance.assert_called_once_with(instance)
+        di.set_instance(key, instance)
+        provider.set_instance.assert_called_once_with(instance)
 
     def test_get_provider(self, di, provider_kv):
         key, provider = provider_kv
@@ -131,12 +131,12 @@ class TestDi(object):
 
     def test_example_set_instance(self, di):
         apple = object()
-        di.register_instance('apple', apple)
+        di.set_instance('apple', apple)
         assert di.resolve('apple') == apple
 
         # If no factory is registered already with this key, one is created using the optional scope keyword argument.
         banana = object()
-        di.register_instance('banana', banana, default_scope=GlobalScope)
+        di.set_instance('banana', banana, default_scope=GlobalScope)
         assert di.resolve('banana') == banana
 
     def test_example_inject(self, di):

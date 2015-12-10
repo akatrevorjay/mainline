@@ -151,7 +151,7 @@ class Di(ICatalog):
         self._providers[key] = provider
         return factory
 
-    def register_instance(self, key, instance, default_scope=GlobalScope):
+    def set_instance(self, key, instance, default_scope=GlobalScope):
         '''
         Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given scope.
 
@@ -166,7 +166,7 @@ class Di(ICatalog):
             # We don't know how to create this kind of instance at this time, so add it without a factory.
             factory = None
             self.register_factory(key, factory, default_scope)
-        self._providers[key].register_instance(instance)
+        self._providers[key].set_instance(instance)
 
     def depends_on(self, *keys):
         '''
