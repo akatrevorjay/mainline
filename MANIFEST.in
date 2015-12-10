@@ -1,1 +1,1 @@
-include README.md LICENSE.md test_requirements.txt
+include README.rst LICENSE.md requirements/*.txt
