@@ -27,8 +27,8 @@ First things first, create your instance of :class:`~mainline.di.Di`:
     >>> di = Di()
 
 
-Simple factory registration and resolution of an instance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Factory registration and resolution of an instance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When registering a factory, you can specify a scope. The factory provided will be called to construct an instance once in the scope provided.
 After that, the already constructed product of the factory will be injected for all calls to :func:`~mainline.di.Di.inject` with the registered key in the specified scope.
@@ -55,12 +55,13 @@ However, you may provide your own custom scopes as well by providing any object 
     >>> @di.register_factory('apple', scope='global')
     ... def apple():
     ...    return 'apple'
+
     >>> di.resolve('apple') == 'apple'
     True
 
 
-Simple instance registration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instance registration
+~~~~~~~~~~~~~~~~~~~~~
 
 If you want to inject an already instantiated object, you can do so with :func:`~mainline.di.Di.set_instance`.
 
@@ -82,6 +83,142 @@ The instance is then injected into the factory as if it had been created by it.
     >>> banana = object()
     >>> di.set_instance('banana', banana, default_scope='thread')
     >>> di.resolve('banana') == banana
+    True
+
+
+Injection
+~~~~~~~~~
+
+Great care has been taken to maintain introspection on injection.
+
+Using :func:`~mainline.di.Di.inject` preserves your method signature minus any injected arguments.
+
+
+Positional arguments are injected in the order given:
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.inject('apple')
+    ... def injected(apple):
+    ...     return apple
+
+    >>> injected() == apple()
+    True
+
+
+Injecting keyword arguments is straight forward, you simply hand them as keyword arguments:
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.register_factory('banana')
+    ... @di.inject('apple')
+    ... def banana(apple):
+    ...     return 'banana', apple
+
+    >>> @di.inject('apple', a_banana='banana')
+    ... def injected(apple, arg1, a_banana=None):
+    ...     return apple, arg1, a_banana
+
+    >>> injected('arg1') == (apple(), 'arg1', banana())
+    True
+
+
+You can inject a class-level property using :func:`~mainline.di.Di.inject_classproperty`:
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.inject_classproperty('apple')
+    ... class Injectee(object):
+    ...     pass
+
+    >>> Injectee.apple == apple()
+    True
+
+
+Arguments that are not injected work as expected:
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.inject('apple')
+    ... def injected(apple, arg1):
+    ...     return apple, arg1
+
+    >>> injected('arg1') == (apple(), 'arg1')
+    True
+
+
+Injection on a class injects upon it's `__init__` method:
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.inject('apple')
+    ... class Injectee(object):
+    ...     def __init__(self, apple):
+    ...         self.apple = apple
+
+    >>> Injectee().apple == apple()
+    True
+
+
+Provider keys
+-------------
+
+Provider keys don't have to be strings.
+It's just a mapping internally, so they can be any hashable object.
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> class Test(object):
+    ...     pass
+
+    >>> # Thread scopes are stored in a thread local
+    ... @di.register_factory(Test, scope='thread')
+    ... def test_factory():
+    ...     return Test()
+
+    >>> @di.inject(Test)
+    ... def injected(test):
+    ...     return test
+
+    >>> isinstance(injected(), Test)
     True
 
 
@@ -134,11 +271,7 @@ The :class:`~mainline.catalog.Catalog` class provides a declarative way to group
     True
 
 
-Di as a Catalog
-^^^^^^^^^^^^^^^
-
-Di supports the ICatalog interface as well, so you can also update Di
-instances from other Di instances.
+You can update a Di instance from another as well:
 
 .. testsetup::
     >>> di = Di()
@@ -165,115 +298,11 @@ instances from other Di instances.
     True
 
 
-Injection of positional and keyword arguments
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. testsetup::
-    >>> di = Di()
-
-.. code:: python
-
-    >>> @di.register_factory('apple')
-    ... def apple():
-    ...     return 'apple'
-
-    >>> @di.inject('apple')
-    ... def injected(apple):
-    ...     return apple
-
-    >>> injected() == apple()
-    True
-
-    >>> @di.inject('apple')
-    ... def injected(apple, arg1):
-    ...     return apple, arg1
-
-    >>> injected('arg1') == (apple(), 'arg1')
-    True
-
-    >>> @di.register_factory('banana')
-    ... @di.inject('apple')
-    ... def banana(apple):
-    ...     return 'banana', apple
-
-    >>> @di.inject('apple', omg='banana')
-    ... def injected(apple, arg1, omg=None):
-    ...     return apple, arg1, omg
-
-    >>> injected('arg1') == (apple(), 'arg1', banana())
-    True
-
-    >>> @di.register_factory('orange')
-    ... @di.inject('apple', not_an_apple='banana')
-    ... def orange(apple, not_an_apple):
-    ...     return 'orange', not_an_apple
-
-    >>> @di.inject('apple', 'orange', omg='banana')
-    ... def injected(apple, orange, arg1, omg=None):
-    ...     return apple, orange, arg1, omg
-
-    >>> injected('arg1') == (apple(), orange(), 'arg1', banana())
-    True
-
-
-Provider keys don't have to be strings
-
-.. code:: python
-
-    >>> class Test(object):
-    ...     pass
-
-    >>> # Thread scopes are stored in a thread local
-    ... @di.register_factory(Test, scope='thread')
-    ... def test_factory():
-    ...     return Test()
-
-    >>> @di.inject(Test)
-    ... def injected(test):
-    ...     return test
-
-    >>> isinstance(injected(), Test)
-    True
-
-
-Injection on object init
-
-.. code:: python
-
-    >>> @di.inject('apple')
-    ... class Injectee(object):
-    ...     def __init__(self, apple):
-    ...         self.apple = apple
-
-    >>> Injectee().apple == apple()
-    True
-
-
-Injection as a classproperty
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. testsetup::
-    >>> di = Di()
-
-.. code:: python
-
-    >>> @di.register_factory('apple')
-    ... def apple():
-    ...     return 'apple'
-
-    >>> @di.inject_classproperty('apple')
-    ... class Injectee(object):
-    ...     pass
-
-    >>> Injectee.apple == apple()
-    True
-
-
 Auto injection based on name in argspec
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Do yourself a favor and use this sparingly. The magic on this one is
-real.
+Injecting providers based upon the argpsec can be done with :func:`~mainline.di.Di.auto_inject`.
+Don't use this for anything but toys; there's simply too much magic going on with such things.
 
 .. testsetup::
     >>> di = Di()
