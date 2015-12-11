@@ -9,6 +9,7 @@ Tested with Python 2.7, 3.4, 3.5.
 
 - Docs: http://mainline.readthedocs.org/en/latest
 - API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
+- PyPi: https://pypi.python.org/pypi/mainline
 
 
 Installation
