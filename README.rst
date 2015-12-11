@@ -21,6 +21,8 @@ Usage
 
 First things first, create your instance of :class:`~mainline.di.Di`:
 
+.. code:: python
+
     >>> from mainline import Di
     >>> di = Di()
 
@@ -48,7 +50,7 @@ However, you may provide your own custom scopes as well by providing any object 
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> @di.register_factory('apple', scope='global')
     ... def apple():
@@ -70,7 +72,7 @@ The instance is then injected into the factory as if it had been created by it.
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> apple = object()
     >>> di.set_instance('apple', apple)
@@ -91,7 +93,7 @@ The :class:`~mainline.catalog.Catalog` class provides a declarative way to group
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> class CommonCatalog(di.Catalog):
     ...     # di.provider() is a Provider factory.
@@ -141,7 +143,7 @@ instances from other Di instances.
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> @di.register_factory('apple')
     ... def apple():
@@ -169,7 +171,7 @@ Injection of positional and keyword arguments
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> @di.register_factory('apple')
     ... def apple():
@@ -216,7 +218,7 @@ Injection of positional and keyword arguments
 
 Provider keys don't have to be strings
 
-.. code::
+.. code:: python
 
     >>> class Test(object):
     ...     pass
@@ -236,7 +238,7 @@ Provider keys don't have to be strings
 
 Injection on object init
 
-.. code::
+.. code:: python
 
     >>> @di.inject('apple')
     ... class Injectee(object):
@@ -253,7 +255,7 @@ Injection as a classproperty
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> @di.register_factory('apple')
     ... def apple():
@@ -276,7 +278,7 @@ real.
 .. testsetup::
     >>> di = Di()
 
-.. code::
+.. code:: python
 
     >>> @di.register_factory('apple')
     ... def apple():
