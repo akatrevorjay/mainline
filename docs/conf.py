@@ -125,7 +125,17 @@ html_theme = 'alabaster'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    # 'logo': 'logo.png',
+    'github_user': 'vertical-knowledge',
+    'github_repo': 'mainline',
+    'github_button': True,
+    'github_banner': True,
+    'sidebar_includehidden': True,
+    # 'extra_nav_links': {
+    #     'CircleCI': 'https://circleci.com/gh/vertical-knowledge/mainline',
+    # },
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -165,7 +175,25 @@ html_static_path = ['_static']
 #html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
+html_sidebars = {
+    'index': [
+        'about.html',
+        'localtoc.html',
+        'navigation.html',
+        'relations.html',
+        'sourcelink.html',
+        'searchbox.html',
+        'donate.html',
+    ],
+    '**': [
+        'about.html',
+        'localtoc.html',
+        'relations.html',
+        'sourcelink.html',
+        'searchbox.html',
+        'donate.html',
+    ]
+}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
