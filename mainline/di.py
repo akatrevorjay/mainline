@@ -4,7 +4,7 @@ from mainline.catalog import ICatalog, Catalog
 from mainline.exceptions import UnresolvableError
 from mainline.injection import ClassPropertyInjector, AutoSpecInjector, SpecInjector
 from mainline.scope import ScopeRegistry, NoneScope, GlobalScope
-from mainline.provider import provider_factory
+from mainline.provider import Provider, provider_factory
 
 _sentinel = object()
 
@@ -14,6 +14,11 @@ class Di(ICatalog):
     Dependency injection container.
     '''
     scopes = ScopeRegistry()
+
+    # Hook these in for usability
+    provider = staticmethod(provider_factory)
+    Catalog = Catalog
+    Provider = Provider
 
     def __init__(self, providers_factory=Catalog, dependencies_factory=dict):
         self._providers = providers_factory()
@@ -125,9 +130,6 @@ class Di(ICatalog):
         '''
         deps = self.get_deps(obj)
         return list(self.iresolve(*deps))
-
-    # Hook this in for usability
-    provider = staticmethod(provider_factory)
 
     def register_factory(self, key, factory=_sentinel, scope=NoneScope, allow_overwrite=False):
         '''
