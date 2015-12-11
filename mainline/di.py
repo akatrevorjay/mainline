@@ -47,6 +47,8 @@ class Di(ICatalog):
         :type catalog: ICatalog or collections.Mapping
         :param dependencies: Mapping of dependencies
         :type dependencies: collections.Mapping
+        :param allow_overwrite: If True, allow overwriting existing keys. Only applies to providers.
+        :type allow_overwrite: bool
         '''
         if catalog:
             self._providers.update(catalog, allow_overwrite=allow_overwrite)

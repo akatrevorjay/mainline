@@ -31,6 +31,8 @@ class ProviderMapping(ProxyMutableMapping):
 
         :param arg: Di/Catalog/Mapping to update from.
         :type arg: ICatalog or collections.Mapping
+        :param allow_overwrite: If True, allow overwriting existing keys
+        :type allow_overwrite: bool
         '''
         # If arg happens to be an ICatalog subclass
         if inspect.isclass(arg) and issubclass(arg, ICatalog) or isinstance(arg, ICatalog):
