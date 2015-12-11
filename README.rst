@@ -9,7 +9,15 @@ Tested with Python 2.7, 3.4, 3.5.
 
 - Docs: http://mainline.readthedocs.org/en/latest
 - API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
-- Installation: http://mainline.readthedocs.org/en/latest/index.html#installation
+
+
+Installation
+------------
+
+.. code:: sh
+
+    pip install mainline
+
 
 
 Running tests
