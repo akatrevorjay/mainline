@@ -3,8 +3,8 @@ import functools
 from mainline.catalog import ICatalog, Catalog
 from mainline.exceptions import UnresolvableError
 from mainline.injection import ClassPropertyInjector, AutoSpecInjector, SpecInjector
-from mainline.scope import ScopeRegistry
-from mainline.provider import provider_factory
+from mainline.scope import ScopeRegistry, NoneScope, GlobalScope
+from mainline.provider import Provider, provider_factory
 
 _sentinel = object()
 
@@ -14,6 +14,11 @@ class Di(ICatalog):
     Dependency injection container.
     '''
     scopes = ScopeRegistry()
+
+    # Hook these in for usability
+    provider = staticmethod(provider_factory)
+    Catalog = Catalog
+    Provider = Provider
 
     def __init__(self, providers_factory=Catalog, dependencies_factory=dict):
         self._providers = providers_factory()
@@ -34,7 +39,7 @@ class Di(ICatalog):
         '''
         return self._dependencies
 
-    def update(self, catalog=None, dependencies=None):
+    def update(self, catalog=None, dependencies=None, allow_overwrite=False):
         '''
         Convenience method to update this Di instance with the specified contents.
 
@@ -42,9 +47,11 @@ class Di(ICatalog):
         :type catalog: ICatalog or collections.Mapping
         :param dependencies: Mapping of dependencies
         :type dependencies: collections.Mapping
+        :param allow_overwrite: If True, allow overwriting existing keys. Only applies to providers.
+        :type allow_overwrite: bool
         '''
         if catalog:
-            self._providers.update(catalog)
+            self._providers.update(catalog, allow_overwrite=allow_overwrite)
         if dependencies:
             self._dependencies.update(dependencies)
 
@@ -126,10 +133,7 @@ class Di(ICatalog):
         deps = self.get_deps(obj)
         return list(self.iresolve(*deps))
 
-    # Hook this in for usability
-    provider = staticmethod(provider_factory)
-
-    def register_factory(self, key, factory=_sentinel, scope='singleton'):
+    def register_factory(self, key, factory=_sentinel, scope=NoneScope, allow_overwrite=False):
         '''
         Creates and registers a provider using the given key, factory, and scope.
         Can also be used as a decorator.
@@ -145,15 +149,16 @@ class Di(ICatalog):
         '''
         if factory is _sentinel:
             return functools.partial(self.register_factory, key, scope=scope)
-        if key in self._providers:
+        if not allow_overwrite and key in self._providers:
             raise KeyError("Key %s already exists" % key)
         provider = self.provider(factory, scope)
         self._providers[key] = provider
         return factory
 
-    def set_instance(self, key, instance, default_scope='singleton'):
+    def set_instance(self, key, instance, default_scope=GlobalScope):
         '''
-        Sets instance under specified provider key. If a provider for specified key does not exist, one is created without a provider using the given default_scope.
+        Sets instance under specified provider key. If a provider for specified key does not exist, one is created
+        without a factory using the given scope.
 
         :param key: Provider key
         :type key: object
@@ -204,7 +209,8 @@ class Di(ICatalog):
 
     def inject(self, *args, **kwargs):
         '''
-        Decorator that injects the specified arguments when the wrapped is called. Argspec is modified on the wrapped accordingly.
+        Decorator that injects the specified arguments when the wrapped is called. Argspec is modified on the wrapped
+        accordingly.
 
         Positional arguments are injected in the order they are given.
 
@@ -223,7 +229,8 @@ class Di(ICatalog):
 
     def auto_inject(self, *args, **kwargs):
         '''
-        Decorator that magically inspects the argspec of the wrapped upon call, injecting provider instances as names match. It's recommended to use inject() where possible and not this heap of black magic.
+        Decorator that magically inspects the argspec of the wrapped upon call, injecting provider instances as names
+        match. It's recommended to use inject() where possible and not this heap of black magic.
 
         Positional arguments are added as dependencies to wrapped.
 

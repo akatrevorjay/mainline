@@ -22,12 +22,11 @@ conf = dict(
     version=__version__,
     packages=['mainline'],
 
-    install_requires=[
-        'wrapt',
-    ],
+    install_requires=parse_requirements('requirements/install.txt'),
+    tests_require=parse_requirements('requirements/test.txt'),
 
+    # This gets populated below if necessary
     setup_requires=[],
-    tests_require=parse_requirements('test_requirements.txt'),
 )
 
 conf['download_url'] = '{url}/tarball/{version}'.format(**conf)

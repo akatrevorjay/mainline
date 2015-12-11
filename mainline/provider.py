@@ -1,8 +1,7 @@
 import functools
 
 from mainline.exceptions import UnprovidableError
-from mainline.scope import ScopeRegistry
-
+from mainline.scope import ScopeRegistry, NoneScope
 _sentinel = object()
 
 
@@ -53,7 +52,7 @@ class IFactoryProvider(IProvider):
 class Provider(IFactoryProvider):
     scopes = ScopeRegistry()
 
-    def __init__(self, factory, scope='singleton', key=''):
+    def __init__(self, factory, scope=NoneScope, key=''):
         self.key = key
         self.scope = self.scopes.resolve(scope)
         super(Provider, self).__init__(factory)
@@ -77,7 +76,7 @@ class Provider(IFactoryProvider):
         self.scope[self.key] = instance
 
 
-def provider_factory(factory=_sentinel, scope='singleton'):
+def provider_factory(factory=_sentinel, scope=NoneScope):
     '''
     Decorator to create a provider using the given factory, and scope.
     Can also be used in a non-decorator manner.

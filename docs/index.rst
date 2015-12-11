@@ -6,17 +6,17 @@
 Welcome to mainline's documentation!
 ====================================
 
-Contents:
-
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 3
+    :hidden:
 
-   intro.md
-   mainline.rst
+    API <mainline.rst>
+
+.. include:: docs.rst
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
