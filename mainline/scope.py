@@ -33,6 +33,10 @@ class IScope(ProxyMutableMapping):
             key = self._key(key)
         return key
 
+    def __contains__(self, key):
+        key = self._key_factory(key)
+        return super(IScope, self).__contains__(key)
+
     def __getitem__(self, key):
         key = self._key_factory(key)
         return super(IScope, self).__getitem__(key)

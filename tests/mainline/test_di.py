@@ -114,6 +114,20 @@ class TestDi(object):
         factory.assert_called_once_with()
         assert instance is factory.return_value
 
+        factory.reset_mock()
+        # Force that we give a different object
+        factory.return_value = object()
+        if scope in ['none', di.scopes['none']]:
+            # NoneScope always returns a new instance
+            second_instance = di.resolve(key)
+            factory.assert_called_once_with()
+            assert id(second_instance) != id(instance)
+        else:
+            # Test that provider returns the same object for multiple resolutions
+            second_instance = di.resolve(key)
+            factory.assert_not_called()
+            assert id(second_instance) == id(instance)
+
     @pytest.mark.parametrize('deps', [('dep0',), ('dep0', 'dep1')])
     def test_depends_on(self, di, deps):
         @di.depends_on(*deps)
