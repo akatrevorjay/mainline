@@ -95,6 +95,10 @@ def replacable(iterable, replacements):
         yield orig_arg, arg
 
 
+class NotFound(Exception):
+    pass
+
+
 class AutoSpecInjector(CallableInjector):
 
     def decorate(self, wrapped):
@@ -105,39 +109,64 @@ class AutoSpecInjector(CallableInjector):
             # injectables = set(self.injectables or self.di.providers)
             injectables = set(self.di.providers)
 
-            injected_args = []
-            args_cur_index = 0
-            for orig_arg, arg in replacable(spec.args, self.kwargs):
+            # These are py3 only, so use getattr with a default
+            spec_kwonlyargs = getattr(spec, 'kwonlyargs', [])
+            spec_annotations = getattr(spec, 'annotations', {})
+
+            def _find_injectable(arg):
+                # Allow override of injected name via kwarg syntax injected_as_name=injectable_name
+                arg = self.kwargs.pop(arg, arg)
+
+                # If exact match, return that; it gets priority over annotations
                 if arg in injectables:
-                    obj = self.di.resolve(arg)
-                else:
+                    return self.di.resolve(arg)
+
+                # Py3 argument annotations: def test(blah: 'an_annotation')
+                if arg in spec_annotations:
+                    # Allow override of injected name via annotation (py3)
+                    # Note: this should only be tried after the exact match
+                    arg_annotation = spec_annotations[arg]
+                    if arg_annotation in injectables:
+                        return self.di.resolve(arg_annotation)
+
+                # Nope, can't be found
+                raise NotFound(arg)
+
+            injected_args = []
+            injected_kwargs = {}
+
+            # Positional args
+            args_cur_index = 0
+            for arg in spec.args:
+                try:
+                    obj = _find_injectable(arg)
+                except NotFound:
                     try:
                         obj = args[args_cur_index]
                         args_cur_index += 1
                     except IndexError:
                         # This means there aren't enough args given, which means this will most likely result in
                         # TypeError. Just let that happen so we don't hide the true exception.
-                        continue
+                        break  # this is wanted since these are positional
                 injected_args.append(obj)
 
-            # Add in any given args
+            # Top it off with any remaining positional args
             remaining_args = args[args_cur_index:]
             if remaining_args:
                 injected_args.extend(remaining_args)
 
-            injected_kwargs = {}
-            # This is py3 only, so use getattr with a default
-            for orig_arg, arg in replacable(getattr(spec, 'kwonlyargs', []), self.kwargs):
-                if arg in injectables:
-                    obj = self.di.resolve(arg)
-                else:
+            # Py3 keyword only args: def test(*, arg1)
+            for arg in spec_kwonlyargs:
+                try:
+                    obj = _find_injectable(arg)
+                except NotFound:
                     try:
-                        obj = kwargs.pop(orig_arg)
+                        obj = kwargs.pop(arg)
                     except KeyError:
                         # This means there aren't enough args given, which means this will most likely result in
                         # TypeError. Just let that happen so we don't hide the true exception.
                         continue
-                injected_kwargs[orig_arg] = obj
+                injected_kwargs[arg] = obj
 
             injected_kwargs.update({
                 k: self.di.resolve(v)
