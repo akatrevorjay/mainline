@@ -88,13 +88,6 @@ class SpecInjector(CallableInjector):
         return decorator(wrapped)
 
 
-def replacable(iterable, replacements):
-    for orig_arg in iterable:
-        # Allow override of injected name via kwarg syntax injected_as_name=injectable_name
-        arg = replacements.pop(orig_arg, orig_arg)
-        yield orig_arg, arg
-
-
 class NotFound(Exception):
     pass
 
@@ -168,11 +161,12 @@ class AutoSpecInjector(CallableInjector):
                         continue
                 injected_kwargs[arg] = obj
 
-            injected_kwargs.update({
-                k: self.di.resolve(v)
-                for k, v in six.iteritems(self.kwargs)
-                if k not in kwargs  # No need to resolve if we're overridden
-            })
+            injected_kwargs.update(
+                {
+                    k: self.di.resolve(v)
+                    for k, v in six.iteritems(self.kwargs) if k not in kwargs  # No need to resolve if we're overridden
+                }
+            )
 
             if kwargs:
                 injected_kwargs.update(kwargs)
