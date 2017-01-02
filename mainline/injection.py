@@ -15,6 +15,7 @@ except ImportError:
 
 
 class Injector(object):
+
     def __init__(self, di):
         self.di = di
 
@@ -26,6 +27,7 @@ class Injector(object):
 
 
 class CallableInjector(Injector):
+
     def __init__(self, di, *args, **kwargs):
         super(CallableInjector, self).__init__(di)
         self.args = args
@@ -56,6 +58,7 @@ class CallableInjector(Injector):
 
 
 class SpecInjector(CallableInjector):
+
     def decorate(self, wrapped):
         # Remove the number of args from the wrapped function's argspec
         spec = getargspec(wrapped)
@@ -80,6 +83,7 @@ class SpecInjector(CallableInjector):
 
 
 class AutoSpecInjector(CallableInjector):
+
     def decorate(self, wrapped):
         spec = getargspec(wrapped)
 
@@ -119,6 +123,7 @@ class AutoSpecInjector(CallableInjector):
 
 
 class ClassPropertyInjector(Injector):
+
     def __init__(self, di, key, name=None, replace_on_access=False):
         super(ClassPropertyInjector, self).__init__(di)
         self.key = key

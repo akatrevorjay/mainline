@@ -68,10 +68,7 @@ class CatalogMeta(abc.ABCMeta):
         else:
             cls._providers = mcs._provider_mapping_factory()
 
-        cls._providers.update(
-                {k: v for k, v in six.iteritems(attributes)
-                 if isinstance(v, IProvider)}
-        )
+        cls._providers.update({k: v for k, v in six.iteritems(attributes) if isinstance(v, IProvider)})
 
         return cls
 

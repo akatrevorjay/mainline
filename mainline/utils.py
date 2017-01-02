@@ -15,6 +15,7 @@ OBJECT_INIT = _get_object_init()
 
 
 class classproperty(object):
+
     def __init__(self, f):
         self.f = f
 
@@ -23,6 +24,7 @@ class classproperty(object):
 
 
 class ProxyMutableMapping(collections.MutableMapping):
+
     def __init__(self, mapping):
         self.__mapping = mapping
 

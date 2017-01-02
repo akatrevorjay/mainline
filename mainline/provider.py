@@ -6,6 +6,7 @@ _sentinel = object()
 
 
 class IProvider(object):
+
     def __init__(self):
         pass
 
@@ -27,6 +28,7 @@ class IProvider(object):
 
 
 class IFactoryProvider(IProvider):
+
     def __init__(self, factory=None):
         self.set_factory(factory)
 
@@ -58,9 +60,7 @@ class Provider(IFactoryProvider):
         super(Provider, self).__init__(factory)
 
     def __repr__(self):
-        return '<%s factory=%s scope=%s>' % (self.__class__.__name__,
-                                             self.factory,
-                                             self.scope)
+        return '<%s factory=%s scope=%s>' % (self.__class__.__name__, self.factory, self.scope)
 
     def provide(self, *args, **kwargs):
         if self.has_instance():
