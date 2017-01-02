@@ -7,6 +7,12 @@ import wrapt
 from mainline.exceptions import DiError
 from mainline.utils import OBJECT_INIT, classproperty
 
+try:
+    from inspect import FullArgSpec as ArgSpec
+    from inspect import getfullargspec as getargspec
+except ImportError:
+    from inspect import ArgSpec, getargspec
+
 
 class Injector(object):
     def __init__(self, di):
@@ -52,12 +58,11 @@ class CallableInjector(Injector):
 class SpecInjector(CallableInjector):
     def decorate(self, wrapped):
         # Remove the number of args from the wrapped function's argspec
-        spec = inspect.getargspec(wrapped)
+        spec = getargspec(wrapped)
         new_args = spec.args[len(self.args):]
-        spec.keywords
 
         # Update argspec
-        spec = inspect.ArgSpec(new_args, *spec[1:])
+        spec = ArgSpec(new_args, *spec[1:])
 
         @wrapt.decorator(adapter=spec)
         def decorator(wrapped, instance, args, kwargs):
@@ -76,7 +81,7 @@ class SpecInjector(CallableInjector):
 
 class AutoSpecInjector(CallableInjector):
     def decorate(self, wrapped):
-        spec = inspect.getargspec(wrapped)
+        spec = getargspec(wrapped)
 
         def decorator(*args, **kwargs):
             if self.injectables:
@@ -93,7 +98,12 @@ class AutoSpecInjector(CallableInjector):
                     obj = self.di.resolve(arg)
                     injected_args.append(obj)
                 else:
-                    injected_args.append(args[args_cur_index])
+                    try:
+                        injected_args.append(args[args_cur_index])
+                    except IndexError:
+                        # This means there aren't enough args given, which means this will most likely result in
+                        # TypeError. Just let that happen, python is an adults only playground ;)
+                        continue
                     args_cur_index += 1
             remaining_args = args[args_cur_index:]
             if remaining_args:
