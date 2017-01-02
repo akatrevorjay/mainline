@@ -76,8 +76,7 @@ class SpecInjector(CallableInjector):
 
             injected_kwargs = {
                 k: self.di.resolve(v)
-                for k, v in six.iteritems(self.kwargs)
-                if k not in kwargs  # No need to resolve if we're overridden
+                for k, v in six.iteritems(self.kwargs) if k not in kwargs  # No need to resolve if we're overridden
             }
 
             if kwargs:
