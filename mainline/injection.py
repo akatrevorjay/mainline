@@ -70,10 +70,16 @@ class SpecInjector(CallableInjector):
         @wrapt.decorator(adapter=spec)
         def decorator(wrapped, instance, args, kwargs):
             injected_args = list(self.di.iresolve(*self.args))
-            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
 
             if args:
                 injected_args.extend(args)
+
+            injected_kwargs = {
+                k: self.di.resolve(v)
+                for k, v in six.iteritems(self.kwargs)
+                if k not in kwargs  # No need to resolve if we're overridden
+            }
+
             if kwargs:
                 injected_kwargs.update(kwargs)
 
@@ -82,38 +88,63 @@ class SpecInjector(CallableInjector):
         return decorator(wrapped)
 
 
+def replacable(iterable, replacements):
+    for orig_arg in iterable:
+        # Allow override of injected name via kwarg syntax injected_as_name=injectable_name
+        arg = replacements.pop(orig_arg, orig_arg)
+        yield orig_arg, arg
+
+
 class AutoSpecInjector(CallableInjector):
 
     def decorate(self, wrapped):
         spec = getargspec(wrapped)
 
         def decorator(*args, **kwargs):
-            if self.injectables:
-                injectables = self.injectables
-            else:
-                # TODO This is too much access..
-                injectables = self.di.providers.keys()
+            # TODO Make this not even allow such things, auto should be auto
+            # injectables = set(self.injectables or self.di.providers)
+            injectables = set(self.di.providers)
 
             injected_args = []
             args_cur_index = 0
-            for arg in spec.args:
-                arg = self.kwargs.pop(arg, arg)
+            for orig_arg, arg in replacable(spec.args, self.kwargs):
                 if arg in injectables:
                     obj = self.di.resolve(arg)
-                    injected_args.append(obj)
                 else:
                     try:
-                        injected_args.append(args[args_cur_index])
+                        obj = args[args_cur_index]
+                        args_cur_index += 1
                     except IndexError:
                         # This means there aren't enough args given, which means this will most likely result in
-                        # TypeError. Just let that happen, python is an adults only playground ;)
+                        # TypeError. Just let that happen so we don't hide the true exception.
                         continue
-                    args_cur_index += 1
+                injected_args.append(obj)
+
+            # Add in any given args
             remaining_args = args[args_cur_index:]
             if remaining_args:
                 injected_args.extend(remaining_args)
 
-            injected_kwargs = {k: self.di.resolve(v) for k, v in six.iteritems(self.kwargs)}
+            injected_kwargs = {}
+            # This is py3 only, so use getattr with a default
+            for orig_arg, arg in replacable(getattr(spec, 'kwonlyargs', []), self.kwargs):
+                if arg in injectables:
+                    obj = self.di.resolve(arg)
+                else:
+                    try:
+                        obj = kwargs.pop(orig_arg)
+                    except KeyError:
+                        # This means there aren't enough args given, which means this will most likely result in
+                        # TypeError. Just let that happen so we don't hide the true exception.
+                        continue
+                injected_kwargs[orig_arg] = obj
+
+            injected_kwargs.update({
+                k: self.di.resolve(v)
+                for k, v in six.iteritems(self.kwargs)
+                if k not in kwargs  # No need to resolve if we're overridden
+            })
+
             if kwargs:
                 injected_kwargs.update(kwargs)
 

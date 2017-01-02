@@ -352,6 +352,13 @@ Don't use this for anything but toys; there's simply too much magic going on wit
     >>> injected('arg1') == (apple(), 'arg1', banana())
     True
 
+    >>> @di.auto_inject(renamed_banana='banana')
+    ... def injected(apple, arg1, renamed_banana):
+    ...     return apple, arg1, renamed_banana
+
+    >>> injected('arg1') == (apple(), 'arg1', banana())
+    True
+
 
 Running tests
 -------------
