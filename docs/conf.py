@@ -127,13 +127,13 @@ html_theme = 'alabaster'
 # documentation.
 html_theme_options = {
     # 'logo': 'logo.png',
-    'github_user': 'vertical-knowledge',
+    'github_user': 'akatrevorjay',
     'github_repo': 'mainline',
     'github_button': True,
     'github_banner': True,
     'sidebar_includehidden': True,
     # 'extra_nav_links': {
-    #     'CircleCI': 'https://circleci.com/gh/vertical-knowledge/mainline',
+    #     'CircleCI': 'https://circleci.com/gh/akatrevorjay/mainline',
     # },
 }
 

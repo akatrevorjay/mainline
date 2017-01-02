@@ -12,7 +12,7 @@ def parse_requirements(filename):
 conf = dict(
     name='mainline',
     description='Simple yet powerful python dependency injection for py2/py3k',
-    url='http://github.com/vertical-knowledge/mainline',
+    url='http://github.com/akatrevorjay/mainline',
     author='Trevor Joynson',
     author_email='github@skywww.net',
     license='GPL',
