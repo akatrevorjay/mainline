@@ -1,3 +1,5 @@
 {"timestamp":"1483341019","url":"https://circleci.com/gh/akatrevorjay/mainline/19?utm_campaign=vcs-integration-link\u0026utm_medium=referral\u0026utm_source=github-build-link","status":"success","agent":"ci/circleci"}
 
 {"timestamp":"1483341000","url":"https://coveralls.io/builds/9486179","status":"success","agent":"coverage/coveralls"}
+
+{"timestamp":"1483340999","url":"https://coveralls.io/builds/9486179","agent":"coverage/coveralls"}
