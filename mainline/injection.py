@@ -97,9 +97,9 @@ class AutoSpecInjector(CallableInjector):
         spec = getargspec(wrapped)
 
         def decorator(*args, **kwargs):
-            # TODO Make this not even allow such things, auto should be auto
+            # TODO Might want auto to not be restrictable, hmm.
             # injectables = set(self.injectables or self.di.providers)
-            injectables = set(self.di.providers)
+            injectables = self.di.providers
 
             # These are py3 only, so use getattr with a default
             spec_kwonlyargs = getattr(spec, 'kwonlyargs', [])

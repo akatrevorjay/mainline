@@ -10,9 +10,9 @@ Welcome to :mod:`mainline`'s documentation!
 
 Simple yet powerful python dependency injection.
 
-Tested with Python 2.7, 3.4, 3.5.
+Tested with CPython 2.7/3.5 as well as PyPy 2.7/3.3 (acting).
 
-|Test Status| |Coverage Status| |Documentation Status|
+|ci-badge| |coverage-badge| |docs-badge|
 
 .. toctree::
     :maxdepth: 3
@@ -227,7 +227,7 @@ It's just a mapping internally, so they can be any hashable object.
     ... def test_factory():
     ...     return Test()
 
-    >>> @di.inject(Test)
+    >>> @di.inject(test=Test)
     ... def injected(test):
     ...     return test
 
@@ -315,7 +315,6 @@ Auto injection based on name in argspec
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Injecting providers based upon the argpsec can be done with :func:`~mainline.di.Di.auto_inject`.
-Don't use this for anything but toys; there's simply too much magic going on with such things.
 
 .. testsetup::
     >>> di = Di()
@@ -370,11 +369,11 @@ Tox is used to handle testing multiple python versions.
     tox
 
 
-.. |Test Status| image:: https://circleci.com/gh/akatrevorjay/mainline.svg?style=svg
-   :target: https://circleci.com/gh/akatrevorjay/mainline
-.. |Coverage Status| image:: https://coveralls.io/repos/akatrevorjay/mainline/badge.svg?branch=develop&service=github
+.. |ci-badge| image:: https://circleci.com/gh/akatrevorjay/mainline.svg?style=svg
+   :target: https://circleci.com/gh/akatrevorjay/mainline  # Ignore InvalidLinkBear
+.. |coverage-badge| image:: https://coveralls.io/repos/akatrevorjay/mainline/badge.svg?branch=develop&service=github
    :target: https://coveralls.io/github/akatrevorjay/mainline?branch=develop
-.. |Documentation Status| image:: https://readthedocs.org/projects/mainline/badge/?version=latest
+.. |docs-badge| image:: https://readthedocs.org/projects/mainline/badge/?version=latest
    :target: http://mainline.readthedocs.org/en/latest/?badge=latest
 
 Indices and tables

@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import functools
 
 from mainline.catalog import ICatalog, Catalog
@@ -207,7 +209,7 @@ class Di(ICatalog):
         '''
         return ClassPropertyInjector(self, key, name=name, replace_on_access=replace_on_access)
 
-    def inject(self, *args, **kwargs):
+    def inject_exact(self, *args, **kwargs):
         '''
         Decorator that injects the specified arguments when the wrapped is called. Argspec is modified on the wrapped
         accordingly.
@@ -216,11 +218,11 @@ class Di(ICatalog):
 
         Keyword arguments are injected with the given key name, eg omg='whoa' would inject as omg=<whoa instance>.
 
-        Any specified provider keys are added as dependencies for the wrapped.
+        Any specified provider args are added as dependencies for the wrapped.
 
-        :param keys: Provider keys to inject as positional arguments
-        :type keys: tuple
-        :param kwargs: Mapping of keyword argument name to provider keys to inject as keyword arguments
+        :param args: Provider args to inject as positional arguments
+        :type args: tuple
+        :param kwargs: Mapping of keyword argument name to provider args to inject as keyword arguments
         :type kwargs: dict
         :return: decorator
         :rtype: decorator
@@ -230,21 +232,28 @@ class Di(ICatalog):
     def auto_inject(self, *args, **kwargs):
         '''
         Decorator that magically inspects the argspec of the wrapped upon call, injecting provider instances as names
-        match. It's recommended to use inject() where possible and not this heap of black magic.
+        match.
+
+        Performance wise, this is currently slower than `inject_exact` as more is done each runtime to determine what
+        needs to be injected.
 
         Positional arguments are added as dependencies to wrapped.
 
         Keyword arguments are handled similarly to inject(), being a mapping of keyword argument name to provider key.
 
-        Any specified provider keys are added as dependencies for the wrapped.
+        Any specified provider args are added as dependencies for the wrapped.
 
         If dependencies are associated with the wrapped, only those are checked for match in the argspec.
 
-        :param keys: Provider keys to inject as positional arguments
-        :type keys: tuple
-        :param kwargs: Mapping of keyword argument name to provider keys to inject as keyword arguments
+        :param args: Provider args to inject as positional arguments
+        :type args: tuple
+        :param kwargs: Mapping of keyword argument name to provider args to inject as keyword arguments
         :type kwargs: dict
         :return: decorator
         :rtype: decorator
         '''
         return AutoSpecInjector(self, *args, **kwargs)
+
+    inject = auto_inject
+
+    __call__ = inject

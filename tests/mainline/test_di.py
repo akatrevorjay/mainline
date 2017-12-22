@@ -2,16 +2,16 @@ import mock
 import pytest
 import itertools
 
-from mainline import Di, Catalog, UnresolvableError, Provider, GlobalScope
+import mainline
 
 
 class TestDi(object):
     # Set of all possible scope values
-    all_scopeish = set(itertools.chain(*Di.scopes.items()))
+    all_scopeish = set(itertools.chain(*mainline.Di.scopes.items()))
 
     @pytest.fixture()
     def di(self):
-        di = Di()
+        di = mainline.Di()
         return di
 
     @pytest.fixture(params=['mock_provider0', 'mock_provider1'])
@@ -27,8 +27,8 @@ class TestDi(object):
         return key, provider
 
     @pytest.fixture(params=dict(
-            mock_deps0=set(['dep0', 'dep1', 'dep2']),
-            mock_deps1=set(['dep0']),
+        mock_deps0=set(['dep0', 'dep1', 'dep2']),
+        mock_deps1=set(['dep0']),
     ).items())
     def dependency_kv(self, di, request):
         key, deps = request.param
@@ -86,13 +86,13 @@ class TestDi(object):
     def test_resolve_unresolvable(self, di):
         di.dependencies['missing_deps'] = set(['missing_dep0'])
         di.providers['missing_deps'] = mock.MagicMock()
-        with pytest.raises(UnresolvableError):
+        with pytest.raises(mainline.UnresolvableError):
             di.resolve('missing_deps')
 
     def test_resolve_many(self, di):
         providers = dict(
-                mock_provider_uno=mock.MagicMock(return_value=object()),
-                mock_provider_dos=mock.MagicMock(return_value=object()),
+            mock_provider_uno=mock.MagicMock(return_value=object()),
+            mock_provider_dos=mock.MagicMock(return_value=object()),
         )
         di.providers.update(providers)
 
@@ -125,11 +125,13 @@ class TestDi(object):
         else:
             # Test that provider returns the same object for multiple resolutions
             second_instance = di.resolve(key)
+            di.resolve()
             factory.assert_not_called()
             assert id(second_instance) == id(instance)
 
     @pytest.mark.parametrize('deps', [('dep0',), ('dep0', 'dep1')])
     def test_depends_on(self, di, deps):
+
         @di.depends_on(*deps)
         def test():
             pass

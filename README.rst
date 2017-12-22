@@ -11,6 +11,8 @@ Tested against Python 2.7 and 3.5.
 
 |ci-badge| |coverage-badge| |docs-badge|
 
+With Python3, you can use function annotations as well as the standard syntax.
+
 - Docs: http://mainline.readthedocs.org/en/latest
 - API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
 - PyPi: https://pypi.python.org/pypi/mainline
