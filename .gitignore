@@ -12,6 +12,7 @@ __pycache__/
 .Python
 env/
 build/
+wheeldir/
 develop-eggs/
 dist/
 downloads/
@@ -62,9 +63,6 @@ target/
 
 # PyCharm
 .idea/
-
-# vkproxy
-/vkproxy.sqlite
 
 # local
 /pillar/local.sls
