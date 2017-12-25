@@ -1,3 +1,7 @@
+"""
+Note that the docs and the README double as tests themselves.
+"""
+
 import mock
 import pytest
 import itertools
