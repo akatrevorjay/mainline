@@ -39,7 +39,7 @@ Why
   You can simply make an alias to get both worlds, however. The world is your oyster.
 
 
-nstallation
+Installation
 ------------
 
 .. code:: sh
