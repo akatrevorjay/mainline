@@ -22,6 +22,9 @@ class Di(ICatalog):
     Catalog = Catalog
     Provider = Provider
 
+    # alias
+    p = provider
+
     def __init__(self, providers_factory=Catalog, dependencies_factory=dict):
         self._providers = providers_factory()
         self._dependencies = dependencies_factory()
@@ -157,6 +160,8 @@ class Di(ICatalog):
         self._providers[key] = provider
         return factory
 
+    f = register_factory
+
     def set_instance(self, key, instance, default_scope=GlobalScope):
         '''
         Sets instance under specified provider key. If a provider for specified key does not exist, one is created
@@ -254,6 +259,12 @@ class Di(ICatalog):
         '''
         return AutoSpecInjector(self, *args, **kwargs)
 
-    inject = auto_inject
+    inject = inject_exact
 
+    # This makes us callable, default to inject_exact for now.
     __call__ = inject
+
+    # aliases
+    i = inject
+    ai = auto_inject
+

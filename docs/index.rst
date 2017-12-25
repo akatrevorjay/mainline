@@ -3,22 +3,51 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-mainline documentation
-======================
+mainline
+========
 
-Welcome to :mod:`mainline`'s documentation!
+.. image:: https://raw.githubusercontent.com/akatrevorjay/mainline/develop/media/logo.png
+    :alt: mainline logo
+    :align: center
 
 Simple yet powerful python dependency injection.
 
-Tested with CPython 2.7/3.5 as well as PyPy 2.7/3.3 (acting).
-
 |ci-badge| |coverage-badge| |docs-badge|
+
+- Docs: http://mainline.readthedocs.org/en/latest
+- API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
+- PyPi: https://pypi.python.org/pypi/mainline
 
 .. toctree::
     :maxdepth: 3
     :hidden:
 
     API <mainline.rst>
+
+
+Why
+---
+
+- Pure Python, so it basically works everywhere.
+  Tested against cPython `3.5`, `3.6`, `3.7` in addition to `2.7`.
+  PyPy/PyPy3 are also fully supported.
+
+- Supports using function annotations in Python `3.x`.
+  This is in addition to a standard syntax that works with both `3.x` and `2.7`.
+
+- Your method signature is fully preserved, maintaining introspection ability.
+  (Minus any injected arguments of course.)
+
+- Scope is fully configurable (per injectable), giving you tight control over where an object should be shared and where it should not.
+
+- Supports auto injection", where your argument names are used to determine what gets injected.
+  It's also fully optional, as it's slightly less performant do to it's dynamic nature.
+
+- Provider keys tend to be strings, but really any hashable object is supported, so if you prefer to use classes, go for it.
+
+  Just keep in mind that you can't use a class as an argument name (rightfully so) in python.
+  This means you can't auto inject it, for instance.
+  You can simply make an alias to get both worlds, however. The world is your oyster.
 
 
 Installation
@@ -73,38 +102,13 @@ However, you may provide your own custom scopes as well by providing any object 
     True
 
 
-Instance registration
-~~~~~~~~~~~~~~~~~~~~~
-
-If you want to inject an already instantiated object, you can do so with :func:`~mainline.di.Di.set_instance`.
-
-If a factory has not been registered under the given key, one is created using the `default_scope` argument as it's scope,
-which defaults to :class:`~mainline.scope.GlobalScope` (ie singleton).
-
-The instance is then injected into the factory as if it had been created by it.
-
-.. testsetup::
-    >>> di = Di()
-
-.. code:: python
-
-    >>> apple = object()
-    >>> di.set_instance('apple', apple)
-    >>> di.resolve('apple') == apple
-    True
-
-    >>> banana = object()
-    >>> di.set_instance('banana', banana, default_scope='thread')
-    >>> di.resolve('banana') == banana
-    True
-
-
 Injection
 ~~~~~~~~~
 
 Great care has been taken to maintain introspection on injection.
 
 Using :func:`~mainline.di.Di.inject` preserves your method signature minus any injected arguments.
+It also has a shortened alias for those like me who don't much love typing all of that via :func:`~mainline.di.Di.i`.
 
 
 Positional arguments are injected in the order given:
@@ -205,6 +209,82 @@ Injection on a class injects upon it's `__init__` method:
     ...         self.apple = apple
 
     >>> Injectee().apple == apple()
+    True
+
+
+Auto injection based on name in argspec
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Injecting providers based upon the argpsec can be done with :func:`~mainline.di.Di.auto_inject`, or it's shortened
+alias :func:`~mainline.di.Di.ai`.
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> @di.register_factory('apple')
+    ... def apple():
+    ...     return 'apple'
+
+    >>> @di.auto_inject()
+    ... def injected(apple):
+    ...     return apple
+
+    >>> injected() == apple()
+    True
+
+    >>> @di.ai('apple')                         # alias for :func:`~mainline.di.Di.auto_inject`
+    ... def injected(apple, arg1):
+    ...     return apple, arg1
+
+    >>> injected('arg1') == (apple(), 'arg1')
+    True
+
+    >>> @di.f('banana')                         # alias for :func:`~mainline.di.Di.register_factory`
+    ... @di.auto_inject()
+    ... def banana(apple):
+    ...     return 'banana', apple
+
+    >>> @di.ai()                                # alias for :func:`~mainline.di.Di.auto_inject`
+    ... def injected(apple, arg1, banana=None):
+    ...     return apple, arg1, banana
+
+    >>> injected('arg1') == (apple(), 'arg1', banana())
+    True
+
+    >>> @di.auto_inject(renamed_banana='banana')
+    ... def injected(apple, arg1, renamed_banana):
+    ...     return apple, arg1, renamed_banana
+
+    >>> injected('arg1') == (apple(), 'arg1', banana())
+    True
+
+
+
+Instance registration
+~~~~~~~~~~~~~~~~~~~~~
+
+If you want to inject an already instantiated object, you can do so with :func:`~mainline.di.Di.set_instance`.
+
+If a factory has not been registered under the given key, one is created using the `default_scope` argument as it's scope,
+which defaults to :class:`~mainline.scope.GlobalScope` (ie singleton).
+
+The instance is then injected into the factory as if it had been created by it.
+
+.. testsetup::
+    >>> di = Di()
+
+.. code:: python
+
+    >>> apple = object()
+    >>> di.set_instance('apple', apple)
+    >>> di.resolve('apple') == apple
+    True
+
+    >>> banana = object()
+    >>> di.set_instance('banana', banana, default_scope='thread')
+    >>> di.resolve('banana') == banana
     True
 
 
@@ -310,53 +390,6 @@ You can update a Di instance from another as well:
     >>> injected() == ('apple', 'banana')
     True
 
-
-Auto injection based on name in argspec
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Injecting providers based upon the argpsec can be done with :func:`~mainline.di.Di.auto_inject`.
-
-.. testsetup::
-    >>> di = Di()
-
-.. code:: python
-
-    >>> @di.register_factory('apple')
-    ... def apple():
-    ...     return 'apple'
-
-    >>> @di.auto_inject()
-    ... def injected(apple):
-    ...     return apple
-
-    >>> injected() == apple()
-    True
-
-    >>> @di.auto_inject('apple')
-    ... def injected(apple, arg1):
-    ...     return apple, arg1
-
-    >>> injected('arg1') == (apple(), 'arg1')
-    True
-
-    >>> @di.register_factory('banana')
-    ... @di.auto_inject()
-    ... def banana(apple):
-    ...     return 'banana', apple
-
-    >>> @di.auto_inject()
-    ... def injected(apple, arg1, banana=None):
-    ...     return apple, arg1, banana
-
-    >>> injected('arg1') == (apple(), 'arg1', banana())
-    True
-
-    >>> @di.auto_inject(renamed_banana='banana')
-    ... def injected(apple, arg1, renamed_banana):
-    ...     return apple, arg1, renamed_banana
-
-    >>> injected('arg1') == (apple(), 'arg1', banana())
-    True
 
 
 Running tests
