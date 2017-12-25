@@ -91,12 +91,14 @@ class ThreadScope(IScope):
 
 
 class ProxyScope(IScope):
+
     def __init__(self, scope, *args, **kwargs):
         self.instances = scope
         super(ProxyScope, self).__init__(*args, **kwargs)
 
 
 class NamespacedProxyScope(ProxyScope):
+
     def __init__(self, namespace, scope, *args, **kwargs):
         self.namespace = namespace
         super(NamespacedProxyScope, self).__init__(scope, *args, **kwargs)

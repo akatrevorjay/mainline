@@ -10,9 +10,9 @@ _provider_mapping_factory = dict
 
 
 class ProviderMapping(ProxyMutableMapping):
-    '''
-    Mixin to provide mapping interface on providers
-    '''
+    """
+    Mixin to provide mapping interface on providers.
+    """
 
     _mapping_factory = _provider_mapping_factory
 
@@ -25,15 +25,16 @@ class ProviderMapping(ProxyMutableMapping):
         self.update(dict(*args, **kwargs))
 
     def update(self, arg, allow_overwrite=False):
-        '''
-        Updates our providers from either an ICatalog subclass/instance or a mapping.
+        """
+        Update our providers from either an ICatalog subclass/instance or a mapping.
+
         If arg is an ICatalog, we update from it's ._providers attribute.
 
         :param arg: Di/Catalog/Mapping to update from.
         :type arg: ICatalog or collections.Mapping
         :param allow_overwrite: If True, allow overwriting existing keys
         :type allow_overwrite: bool
-        '''
+        """
         # If arg happens to be an ICatalog subclass
         if inspect.isclass(arg) and issubclass(arg, ICatalog) or isinstance(arg, ICatalog):
             arg = arg._providers
@@ -45,17 +46,17 @@ class ProviderMapping(ProxyMutableMapping):
 
 
 class ICatalog(object):
-    '''
+    """
     Inherit from this class to note that you support the ICatalog interface
-    '''
+    """
 
     _providers = None
 
 
 class CatalogMeta(abc.ABCMeta):
-    '''
+    """
     Meta class used to populate providers from attributes of Catalog subclass declarations.
-    '''
+    """
 
     _provider_mapping_factory = _provider_mapping_factory
 
@@ -68,10 +69,7 @@ class CatalogMeta(abc.ABCMeta):
         else:
             cls._providers = mcs._provider_mapping_factory()
 
-        cls._providers.update(
-                {k: v for k, v in six.iteritems(attributes)
-                 if isinstance(v, IProvider)}
-        )
+        cls._providers.update({k: v for k, v in six.iteritems(attributes) if isinstance(v, IProvider)})
 
         return cls
 

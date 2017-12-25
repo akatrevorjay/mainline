@@ -1,0 +1,4 @@
+#!/bin/bash
+set -eo pipefail
+
+python setup.py build sdist bdist_wheel

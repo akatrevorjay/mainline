@@ -1,0 +1,37 @@
+[all]
+bears = InvalidLinkBear, FilenameBear, LineCountBear
+; files = **.py, **.md, **.svg, **.yml, **.json, **.rst
+files = **.py, **.md, **.svg, **.yml, **.json
+ignore = .*/**, docs/**.rst
+max_lines_per_file = 1000
+file_naming_convention = auto
+
+; [all.restructuredtext]
+; bears = reSTLintBear, TextLintBear, RSTcheckBear
+; files = **.rst
+
+[all.python]
+bears = RadonBear, PycodestyleBear
+; PyDocStyleBear, YapfBear
+files = **.py
+file_naming_convention = snake
+max_line_length = 120
+
+[all.markdown]
+bears = MarkdownBear, TextLintBear
+files = **.md
+
+[all.yaml]
+bears = TravisLintBear, YAMLLintBear
+files = **.yml
+
+[all.json]
+bears = JSONFormatBear
+files = **.json
+
+[all.xml]
+bears = XMLBear
+files = **.svg
+
+
+#  vim: set ts=2 sw=2 tw=120 et ft=dosini :
