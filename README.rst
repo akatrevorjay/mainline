@@ -40,6 +40,8 @@ Why
   This means you can't auto inject it, for instance.
   You can simply make an alias to get both worlds, however. The world is your oyster.
 
+- Check out that sweet syringe.
+
 
 Installation
 ------------
