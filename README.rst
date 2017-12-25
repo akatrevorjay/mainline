@@ -30,7 +30,7 @@ Why
 - Scope is fully configurable (per injectable), giving you tight control over where an object should be shared and where it should not.
 
 - Supports auto injection", where your argument names are used to determine what gets injected.
-  It's also fully optional, as it's slightly less performant do to it's dynamic nature.
+  It's also fully optional, as it's slightly less performant due to it's dynamic nature.
 
 - Provider keys tend to be strings, but really any hashable object is supported, so if you prefer to use classes, go for it.
 
