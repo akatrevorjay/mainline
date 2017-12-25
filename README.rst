@@ -13,12 +13,6 @@ Simple yet powerful python dependency injection.
 - API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
 - PyPi: https://pypi.python.org/pypi/mainline
 
-.. toctree::
-    :maxdepth: 3
-    :hidden:
-
-    API <mainline.rst>
-
 
 Why
 ---
