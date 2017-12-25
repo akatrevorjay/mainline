@@ -54,29 +54,39 @@ Make sure to check the docs for more use cases!
 
 .. code:: python
 
-    # Initialize your Di instance.
+    """
+    Initialize your Di instance.
+    """
 
     >>> from mainline import Di
     >>> di = Di()
 
-    # Feed it your delicious factories, optionally scoped.
+    """
+    Feed it your delicious factories, optionally scoped.
+    """
 
     >>> @di.register_factory('apple')
     ... def apple():
     ...    return 'apple'
 
-    # Factories can of course be injected themselves.
+    """
+    Factories can of course be injected themselves.
+    """
 
     >>> @di.f('banana', scope='global')     # f is syntactic sugar for register_factory
     ... def banana():
     ...    return 'banana'
 
-    # Let's verify that our factories above do what they're supposed to.
+    """
+    Let's verify that our factories above do what they're supposed to.
+    """
 
     >>> di.resolve('apple') == 'apple' and di.resolve('banana') == 'banana'
     True
 
-    # Positional arguments are injected in the order given:
+    """
+    Positional arguments are injected in the order given:
+    """
 
     >>> @di.inject('apple')
     ... def injected(apple):
@@ -85,7 +95,9 @@ Make sure to check the docs for more use cases!
     >>> injected() == apple()   # verify
     True
 
-    # Injecting keyword arguments is straight forward, you simply hand them as keyword arguments:
+    """
+    Injecting keyword arguments is straight forward, you simply hand them as keyword arguments:
+    """
 
     >>> @di.f('orange')     # alias for register_factory
     ... @di.i('apple')      # alias for inject
@@ -99,7 +111,9 @@ Make sure to check the docs for more use cases!
     >>> injected('arg1') == (apple(), 'arg1', orange())  # verify
     True
 
-    # Arguments that are not injected work as expected:
+    """
+    Arguments that are not injected work as expected:
+    """
 
     >>> @di.inject('apple')
     ... def injected(apple, arg1):
@@ -108,7 +122,9 @@ Make sure to check the docs for more use cases!
     >>> injected('arg1') == (apple(), 'arg1')
     True
 
-    # Injection on a class injects upon it's `__init__` method:
+    """
+    Injection on a class injects upon it's `__init__` method:
+    """
 
     >>> @di.inject('apple')
     ... class Injectee(object):
@@ -118,7 +134,9 @@ Make sure to check the docs for more use cases!
     >>> Injectee().apple == apple()
     True
 
-    # You can inject class-level properties using :func:`~mainline.di.Di.inject_classproperty`:
+    """
+    You can inject class-level properties using `di.inject_classproperty()`:
+    """
 
     >>> @di.inject_classproperty('apple')
     ... class Injectee(object):
@@ -127,7 +145,9 @@ Make sure to check the docs for more use cases!
     >>> Injectee.apple == apple()
     True
 
-    # Injecting providers based upon the argpsec can be done with :func:`~mainline.di.Di.auto_inject`, or it's shortened alias :func:`~mainline.di.Di.ai`:
+    """
+    Injecting providers based upon the argpsec can be done with `di.auto_inject`, or it's shortened alias `di.ai()`:
+    """
 
     >>> @di.auto_inject()
     ... def injected(apple):
