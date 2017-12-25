@@ -3,7 +3,7 @@ import mock
 import test_di
 
 
-class TestDi(test_di.TestDi):  # Ignore PyDocStyleBear
+class TestDi(test_di.TestDi):
     def test_inject_annotations(self, di, dependency_kv):
         key, deps = dependency_kv
 
