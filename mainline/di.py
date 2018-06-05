@@ -153,7 +153,7 @@ class Di(ICatalog):
         :rtype: callable or None
         '''
         if factory is _sentinel:
-            return functools.partial(self.register_factory, key, scope=scope)
+            return functools.partial(self.register_factory, key, scope=scope, allow_overwrite=allow_overwrite)
         if not allow_overwrite and key in self._providers:
             raise KeyError("Key %s already exists" % key)
         provider = self.provider(factory, scope)
