@@ -111,6 +111,42 @@ class NamespacedProxyScope(ProxyScope):
         return '%s__%s' % (self.namespace, key)
 
 
+class ContextScope(IScope):
+    register = True
+    name = 'context'
+
+    SENTINEL = object()
+
+    def __init__(self, *args, **kwargs):
+        self.store = collections.defaultdict(dict)
+        self.stack = ['root']
+
+        super(ContextScope, self).__init__(*args, **kwargs)
+
+    # def __key_transform__(self, key):
+    #     return '%s__%s' % (self.context, key)
+
+    @property
+    def context(self):
+        return '.'.join(self.stack)
+
+    ## TODO ChainMap
+
+    def __enter__(self, context=SENTINEL):
+        if context is in [None, self.SENTINEL]:
+            this_context = object()
+
+        self.stack.append(this_context)
+
+        if this_context not in self.instances:
+            self.instances = self.instances_factory()
+
+        self.instances = self.instances[this_context]
+
+    def __exit__(self, type, value, traceback):
+        self.stack.pop()
+
+
 SCOPE_FACTORIES = {}
 
 
