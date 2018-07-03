@@ -133,7 +133,7 @@ class ContextScope(IScope):
     ## TODO ChainMap
 
     def __enter__(self, context=SENTINEL):
-        if context is in [None, self.SENTINEL]:
+        if context in [None, self.SENTINEL]:
             this_context = object()
 
         self.stack.append(this_context)
