@@ -1,3 +1,10 @@
+# machine:
+#   pre:
+#     - cd /opt/circleci/.pyenv; git pull
+#   python:
+#     version: 3.6.0
+
 dependencies:
   post:
-    - pyenv local 3.5.1 2.7.12
+    - pyenv local 3.7.0 3.6.5 2.7.14
+
