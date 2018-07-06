@@ -6,6 +6,5 @@ machine:
 
 dependencies:
   post:
-    - pyenv local 3.6.5 2.7.14
-    # - pyenv local 3.7.0 3.6.5 2.7.14
+    - pyenv local 3.6.5 2.7.12
 
