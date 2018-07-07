@@ -1,3 +1,11 @@
+machine:
+  pre:
+    - cd /opt/circleci/.pyenv; git pull
+  python:
+    version: 3.6.5
+
 dependencies:
-  post:
-    - pyenv local 3.5.1 2.7.12
+  override:
+    - pip install tox tox-pyenv
+    - pyenv local 3.6.5 2.7.12
+
