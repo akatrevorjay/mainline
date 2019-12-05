@@ -27,26 +27,23 @@ class ProxyMutableMapping(collections.MutableMapping):
     """
     Proxies access to an existing dict-like object.
 
-    # >>> a = dict(whoa=True, hello=[1,2,3], why='always')
-    # >>> b = ProxyMutableMapping(a)
-    #
-    # Nice reprs:
-    #
-    # >>> b
-    # <ProxyMutableMapping {'whoa': True, 'hello': [1, 2, 3], 'why': 'always'}>
-    #
-    # Setting works as you'd expect:
-    #
-    # >>> b['nice'] = False
-    # >>> b['whoa'] = 'yeee'
-    # >>> b
-    # <ProxyMutableMapping {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}>
-    # # <ProxyMutableMapping {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}>
-    #
-    # Checking that the changes are in fact being performed on the proxied object:
-    #
-    # >>> a
-    # {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}
+    >>> a = dict(whoa=True, hello=[1,2,3], why='always')
+    >>> b = ProxyMutableMapping(a)
+
+    Nice reprs:
+
+    >>> b
+    <ProxyMutableMapping {...}>
+
+    Setting works as you'd expect:
+
+    >>> a['nice'] = b['nice'] = False
+    >>> a['whoa'] = b['whoa'] = 'yeee'
+
+    Checking that the changes are in fact being performed on the proxied object:
+
+    >>> b == a
+    True
 
     """
 
