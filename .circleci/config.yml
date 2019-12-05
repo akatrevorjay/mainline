@@ -1,95 +1,107 @@
-# This configuration was automatically generated from a CircleCI 1.0 config.
-# It should include any build commands you had along with commands that CircleCI
-# inferred from your project structure. We strongly recommend you read all the
-# comments in this file to understand the structure of CircleCI 2.0, as the idiom
-# for configuration has changed substantially in 2.0 to allow arbitrary jobs rather
-# than the prescribed lifecycle of 1.0. In general, we recommend using this generated
-# configuration as a reference rather than using it in production, though in most
-# cases it should duplicate the execution of your original 1.0 config.
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
 version: 2
 jobs:
   build:
-    working_directory: ~/akatrevorjay/mainline
-    parallelism: 1
-    shell: /bin/bash --login
-    # CircleCI 2.0 does not support environment variables that refer to each other the same way as 1.0 did.
-    # If any of these refer to each other, rewrite them so that they don't or see https://circleci.com/docs/2.0/env-vars/#interpolating-environment-variables-to-set-other-environment-variables .
-    environment:
-      CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
-      CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
-    # In CircleCI 1.0 we used a pre-configured image with a large number of languages and other packages.
-    # In CircleCI 2.0 you can now specify your own image, or use one of our pre-configured images.
-    # The following configuration line tells CircleCI to use the specified docker image as the runtime environment for you job.
-    # We have selected a pre-built image that mirrors the build environment we use on
-    # the 1.0 platform, but we recommend you choose an image more tailored to the needs
-    # of each job. For more information on choosing an image (or alternatively using a
-    # VM instead of a container) see https://circleci.com/docs/2.0/executor-types/
-    # To see the list of pre-built images that CircleCI provides for most common languages see
-    # https://circleci.com/docs/2.0/circleci-images/
     docker:
-    - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-      command: /sbin/init
+      # specify the version you desire here
+      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
+      - image: trevorj/circleci-builder:latest
+
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
+
+    working_directory: ~/repo
+
     steps:
-    # Machine Setup
-    #   If you break your build into multiple jobs with workflows, you will probably want to do the parts of this that are relevant in each
-    # The following `checkout` command checks out your code to your working directory. In 1.0 we did this implicitly. In 2.0 you can choose where in the course of a job your code should be checked out.
-    - checkout
-    # Prepare for artifact and test results  collection equivalent to how it was done on 1.0.
-    # In many cases you can simplify this from what is generated here.
-    # 'See docs on artifact collection here https://circleci.com/docs/2.0/artifacts/'
-    - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
-    # This is based on your 1.0 configuration file or project settings
-    - run:
-        working_directory: ~/akatrevorjay/mainline
-        command: cd /opt/circleci/.pyenv; git pull
-    # This is based on your 1.0 configuration file or project settings
-    - run:
-        working_directory: ~/akatrevorjay/mainline
-        command: if ["3.6.5" == "system"] || pyenv versions --bare | grep -x -q '3.6.5'; then pyenv global version;else pyenv install --skip-existing  3.6.5 && pyenv global version && pyenv rehash && pip install virtualenv && pip install nose && pip install pep8 && pyenv rehash;fi
-    # Dependencies
-    #   This would typically go in either a build or a build-and-test job when using workflows
-    # Restore the dependency cache
-    - restore_cache:
-        keys:
-        # This branch if available
-        - v1-dep-{{ .Branch }}-
-        # Default branch if not
-        - v1-dep-develop-
-        # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
-        - v1-dep-
-    # This is based on your 1.0 configuration file or project settings
-    - run: pip install tox tox-pyenv
-    - run: pyenv local 3.6.5 2.7.12
-    # Save dependency cache
-    - save_cache:
-        key: v1-dep-{{ .Branch }}-{{ epoch }}
-        paths:
-        # This is a broad list of cache paths to include many possible development environments
-        # You can probably delete some of these entries
-        - vendor/bundle
-        - ~/virtualenvs
-        - ~/.m2
-        - ~/.ivy2
-        - ~/.bundle
-        - ~/.go_workspace
-        - ~/.gradle
-        - ~/.cache/bower
-    # Test
-    #   This would typically be a build job when using workflows, possibly combined with build
-    # The following line was run implicitly in your 1.0 builds based on what CircleCI inferred about the structure of your project. In 2.0 you need to be explicit about which commands should be run. In some cases you can discard inferred commands if they are not relevant to your project.
-    # Python test inference is not supported by the config translator.
-    # Put the commands that you use to run your tests here.
-    # If run your tests in parallel containers you can use this third party nose plugin
-    # https://github.com/dlanger/nose-parallel
-    # If you use django you can switch to the nose django runner to make use of this.
-    - run: echo "replace this with your test commands - see config comments" && false
-    # Teardown
-    #   If you break your build into multiple jobs with workflows, you will probably want to do the parts of this that are relevant in each
-    # Save test results
-    - store_test_results:
-        path: /tmp/circleci-test-results
-    # Save artifacts
-    - store_artifacts:
-        path: /tmp/circleci-artifacts
-    - store_artifacts:
-        path: /tmp/circleci-test-results
+      - setup_remote_docker:
+          version: 17.07.0-ce
+
+      ##
+      ## checkout
+      ##
+
+      - restore_cache:
+          keys:
+            - source-v1-{{ .Branch }}-{{ .Revision }}
+            - source-v1-{{ .Branch }}-
+
+      - checkout
+      - run:
+          name: checkout-submodules
+          command: |
+            echo "# start" >> "$BASH_ENV"
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            git submodule sync --recursive
+            git submodule update --init --recursive
+
+      - save_cache:
+          key: source-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ".git"
+
+      ##
+      ## deps
+      ##
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}
+          # fallback to using the latest cache if no exact match is found
+          # - deps-v1-
+
+      - run:
+          name: install-deps
+          command: |
+            echo "# start" >> "$BASH_ENV"
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            pip install -e .[tests]
+
+      - save_cache:
+          paths:
+            - ./venv
+          key: deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}
+
+      - run:
+          name: run-tests
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+            ./bin/run-tests --ci
+
+      - store_test_results:
+          path: reports/junit
+
+      - restore_cache:
+          keys:
+          - tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}-{{ checksum "requirements/install.pip" }}
+          # fallback to using the latest cache if no exact match is found
+          # - tox-v1-
+
+      - run:
+          name: run-tox
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            ./bin/run-tox
+
+      - save_cache:
+          paths:
+            - ./.tox
+          key: tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}-{{ checksum "requirements/install.pip" }}
+
+      - run:
+          name: coveralls
+          no_output_timeout: 20m
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            [[ -z "$COVERALLS_REPO_TOKEN" ]] \
+                || coveralls --service=circleci
+
