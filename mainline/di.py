@@ -40,7 +40,7 @@ class Di(ICatalog):
     @property
     def dependencies(self):
         '''
-        Public attributes for dependency mapping
+        Public attribute for dependency mapping
         '''
         return self._dependencies
 
