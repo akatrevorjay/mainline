@@ -4,6 +4,8 @@ import collections
 
 from mainline.utils import ProxyMutableMapping
 
+_sentinel = object()
+
 
 class IScope(ProxyMutableMapping):
     register = False
@@ -115,36 +117,34 @@ class ContextScope(IScope):
     register = True
     name = 'context'
 
-    SENTINEL = object()
-
     def __init__(self, *args, **kwargs):
-        self.store = collections.defaultdict(dict)
-        self.stack = ['root']
+        self.stack = []
 
         super(ContextScope, self).__init__(*args, **kwargs)
 
-    # def __key_transform__(self, key):
-    #     return '%s__%s' % (self.context, key)
-
-    @property
-    def context(self):
-        return '.'.join(self.stack)
+        self.store = self.instances
 
     ## TODO ChainMap
 
-    def __enter__(self, context=SENTINEL):
-        if context in [None, self.SENTINEL]:
-            this_context = object()
+    def _set_instances(self):
+        stack = tuple(self.stack)
 
-        self.stack.append(this_context)
+        if stack not in self.store:
+            self.store[stack] = self.instances_factory()
 
-        if this_context not in self.instances:
-            self.instances = self.instances_factory()
+        self.instances = self.store[stack]
+        self._set_mapping(self.instances)
 
-        self.instances = self.instances[this_context]
+    def __enter__(self, context=_sentinel):
+        if context is _sentinel:
+            context = object()
+
+        self.stack.append(context)
+        self._set_instances()
 
     def __exit__(self, type, value, traceback):
         self.stack.pop()
+        self._set_instances()
 
 
 SCOPE_FACTORIES = {}

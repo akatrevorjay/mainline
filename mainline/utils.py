@@ -24,17 +24,55 @@ class classproperty(object):
 
 
 class ProxyMutableMapping(collections.MutableMapping):
+    """
+    Proxies access to an existing dict-like object.
 
-    def __init__(self, mapping):
-        self.__mapping = mapping
+    # >>> a = dict(whoa=True, hello=[1,2,3], why='always')
+    # >>> b = ProxyMutableMapping(a)
+    #
+    # Nice reprs:
+    #
+    # >>> b
+    # <ProxyMutableMapping {'whoa': True, 'hello': [1, 2, 3], 'why': 'always'}>
+    #
+    # Setting works as you'd expect:
+    #
+    # >>> b['nice'] = False
+    # >>> b['whoa'] = 'yeee'
+    # >>> b
+    # <ProxyMutableMapping {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}>
+    # # <ProxyMutableMapping {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}>
+    #
+    # Checking that the changes are in fact being performed on the proxied object:
+    #
+    # >>> a
+    # {'whoa': 'yeee', 'hello': [1, 2, 3], 'why': 'always', 'nice': False}
 
-    _fancy_repr = True
+    """
+
+    def __init__(self, mapping, fancy_repr=True, dictify_repr=False):
+        """
+        :param collections.MutableMapping mapping: Dict-like object to wrap
+        :param bool fancy_repr: If True, show fancy repr, otherwise just show dict's
+        :param bool dictify_repr: If True, cast mapping to a dict on repr
+        """
+        self.__fancy_repr = fancy_repr
+        self.__dictify_repr = dictify_repr
+
+        self._set_mapping(mapping)
 
     def __repr__(self):
-        if self._fancy_repr:
-            return '<%s %s>' % (self.__class__.__name__, self.__mapping)
-        else:
+        if not self.__fancy_repr:
             return '%s' % dict(self)
+
+        mapping = self.__mapping
+        if self.__dictify_repr:
+            mapping = dict(mapping)
+
+        return '<%s %s>' % (self.__class__.__name__, mapping)
+
+    def _set_mapping(self, mapping):
+        self.__mapping = mapping
 
     def __contains__(self, item):
         return item in self.__mapping
