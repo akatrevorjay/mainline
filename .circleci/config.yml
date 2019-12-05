@@ -52,7 +52,7 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-          - deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}
+          - deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.txt" }}
           # fallback to using the latest cache if no exact match is found
           # - deps-v1-
 
@@ -67,7 +67,7 @@ jobs:
       - save_cache:
           paths:
             - ./venv
-          key: deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}
+          key: deps-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.txt" }}
 
       - run:
           name: run-tests
@@ -80,7 +80,7 @@ jobs:
 
       - restore_cache:
           keys:
-          - tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}-{{ checksum "requirements/install.pip" }}
+          - tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.txt" }}-{{ checksum "requirements/install.txt" }}
           # fallback to using the latest cache if no exact match is found
           # - tox-v1-
 
@@ -94,7 +94,7 @@ jobs:
       - save_cache:
           paths:
             - ./.tox
-          key: tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.pip" }}-{{ checksum "requirements/install.pip" }}
+          key: tox-v1-{{ checksum "setup.py" }}-{{ checksum "requirements/tests.txt" }}-{{ checksum "requirements/install.txt" }}
 
       - run:
           name: coveralls
