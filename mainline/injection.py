@@ -1,5 +1,4 @@
 import functools
-import inspect
 
 import six
 import wrapt
@@ -15,6 +14,9 @@ except ImportError:
 
 
 class Injector(object):
+    """
+    Base injector abc.
+    """
 
     def __init__(self, di):
         self.di = di
@@ -27,6 +29,9 @@ class Injector(object):
 
 
 class CallableInjector(Injector):
+    """
+    Base injector for callables.
+    """
 
     def __init__(self, di, *args, **kwargs):
         super(CallableInjector, self).__init__(di)
@@ -58,6 +63,9 @@ class CallableInjector(Injector):
 
 
 class SpecInjector(CallableInjector):
+    """
+    Injects requested deps into a callable's args and kwargs at execution time, taking callable's argspec into account.
+    """
 
     def decorate(self, wrapped):
         # Remove the number of args from the wrapped function's argspec
@@ -84,7 +92,7 @@ class SpecInjector(CallableInjector):
 
             return wrapped(*injected_args, **injected_kwargs)
 
-        return decorator(wrapped)
+        return decorator(wrapped)  # pylint: disable=E1120
 
 
 class NotFound(Exception):
@@ -92,6 +100,11 @@ class NotFound(Exception):
 
 
 class AutoSpecInjector(CallableInjector):
+    """
+    Injects inferred deps into a callable's args and kwargs at execution time.
+
+    Deps are inferred based on the callable's argspec (ie the names of the arguments), and/or function annotations.
+    """
 
     def decorate(self, wrapped):
         spec = getargspec(wrapped)
@@ -176,6 +189,9 @@ class AutoSpecInjector(CallableInjector):
 
 
 class ClassPropertyInjector(Injector):
+    """
+    Injects requested dep into a classproperty.
+    """
 
     def __init__(self, di, key, name=None, replace_on_access=False):
         super(ClassPropertyInjector, self).__init__(di)

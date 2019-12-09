@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -eo pipefail
+set -xv
+
+project_root="${0%/*}/.."
+
+: ${PYTHONUNBUFFERED:=1}
+: ${PYTHONDONTWRITEBYTECODE:=1}
+
+: ${COVERAGE_PROCESS_START:="$project_root/.coveragerc"}
+
+export \
+	${!PYTHON*} \
+	COVERAGE_PROCESS_START \
+ && :
+
+run-tests() {
+	cmd=(pytest)
+
+	case "$1" in
+		--ci)
+			shift
+
+			reports_dir="reports/junit"
+			mkdir -pv "$reports_dir"
+
+			cmd+=(
+			--durations=100
+
+			--cov-report="term-missing:skip-covered"
+
+			--junit-xml="$reports_dir/pytest.xml"
+
+			--cov-config="$project_root/.coveragerc"
+			--no-cov-on-fail
+
+			-s -vvv
+			)
+
+			;;
+	esac
+
+	cmd+=("$@")
+
+	exec "${cmd[@]}"
+}
+
+run-tox() {
+	exec tox "$@"
+}
+
+main() {
+	"${0##*/}" "$@"
+}
+
+main "$@"
+

@@ -1,1 +1,2 @@
-sphinx-apidoc -T -o . ../ ../setup.py
+#!/bin/zsh
+exec sphinx-apidoc -T -o . ../ ../setup.py

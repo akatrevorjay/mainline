@@ -1,0 +1,107 @@
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2
+jobs:
+  build:
+    docker:
+      # specify the version you desire here
+      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
+      - image: trevorj/circleci-builder:latest
+
+      # Specify service dependencies here if necessary
+      # CircleCI maintains a library of pre-built images
+      # documented at https://circleci.com/docs/2.0/circleci-images/
+      # - image: circleci/postgres:9.4
+
+    working_directory: ~/repo
+
+    steps:
+      - setup_remote_docker:
+          version: 17.07.0-ce
+
+      ##
+      ## checkout
+      ##
+
+      - restore_cache:
+          keys:
+            - source-v1-{{ .Branch }}-{{ .Revision }}
+            - source-v1-{{ .Branch }}-
+
+      - checkout
+      - run:
+          name: checkout-submodules
+          command: |
+            echo "# start" >> "$BASH_ENV"
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            git submodule sync --recursive
+            git submodule update --init --recursive
+
+      - save_cache:
+          key: source-v1-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ".git"
+
+      ##
+      ## deps
+      ##
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - deps-v1-{{ checksum "setup.py" }}-{{ checksum "setup.cfg" }}
+          # fallback to using the latest cache if no exact match is found
+          # - deps-v1-
+
+      - run:
+          name: install-deps
+          command: |
+            echo "# start" >> "$BASH_ENV"
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            pip install -e .[tests]
+
+      - save_cache:
+          paths:
+            - ./venv
+          key: deps-v1-{{ checksum "setup.py" }}-{{ checksum "setup.cfg" }}
+
+      - run:
+          name: run-tests
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+            ./bin/run-tests --ci
+
+      - store_test_results:
+          path: reports/junit
+
+      - restore_cache:
+          keys:
+          - tox-v1-{{ checksum "setup.py" }}-{{ checksum "setup.cfg" }}-{{ checksum "requirements/install.txt" }}
+          # fallback to using the latest cache if no exact match is found
+          # - tox-v1-
+
+      - run:
+          name: run-tox
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            ./bin/run-tox
+
+      - save_cache:
+          paths:
+            - ./.tox
+          key: tox-v1-{{ checksum "setup.py" }}-{{ checksum "setup.cfg" }}-{{ checksum "requirements/install.txt" }}
+
+      - run:
+          name: coveralls
+          no_output_timeout: 20m
+          command: |
+            set -xv -eo pipefail; source "$BASH_ENV"
+
+            [[ -z "$COVERALLS_REPO_TOKEN" ]] \
+                || coveralls --service=circleci
+
