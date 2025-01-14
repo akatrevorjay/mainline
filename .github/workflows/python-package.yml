@@ -38,7 +38,9 @@ jobs:
     - name: Test with pytest
       run: |
         coverage run --source=mainline -m pytest
-    - name: Publish coverage
+    - name: Publish coverage to coveralls.io
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         coveralls
 
