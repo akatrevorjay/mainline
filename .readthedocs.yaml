@@ -34,5 +34,5 @@ formats:
 
 python:
   install:
-		- path: .[docs]
+    - requirements: docs/requirements.txt
 
