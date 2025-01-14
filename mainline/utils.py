@@ -1,4 +1,5 @@
 import collections
+import typing
 import sys
 
 import six
@@ -23,7 +24,7 @@ class classproperty(object):
         return self.f(owner)
 
 
-class ProxyMutableMapping(collections.MutableMapping):
+class ProxyMutableMapping(typing.MutableMapping):
     """
     Proxies access to an existing dict-like object.
 

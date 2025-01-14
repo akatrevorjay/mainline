@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 import test_di
 
@@ -7,11 +7,14 @@ class TestDi(test_di.TestDi):
     def test_inject_annotations(self, di, dependency_kv):
         key, deps = dependency_kv
 
-        providers = dict(
-            mock_provider_uno=mock.MagicMock(return_value=object()), )
+        mock_provider_uno=mock.MagicMock(return_value=object())
+        providers = dict(mock_provider_uno=mock_provider_uno)
         di.providers.update(providers)
 
         funcs = []
+
+        # to keep flake8 happy
+        an_annotation = None
 
         def _uno_func(fn):
             funcs.append(fn)

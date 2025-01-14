@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import typing
 import functools
 
 from mainline.catalog import ICatalog, Catalog
@@ -49,9 +50,9 @@ class Di(ICatalog):
         Convenience method to update this Di instance with the specified contents.
 
         :param catalog: ICatalog supporting class or mapping
-        :type catalog: ICatalog or collections.Mapping
+        :type catalog: ICatalog or typing.Mapping
         :param dependencies: Mapping of dependencies
-        :type dependencies: collections.Mapping
+        :type dependencies: typing.Mapping
         :param allow_overwrite: If True, allow overwriting existing keys. Only applies to providers.
         :type allow_overwrite: bool
         '''
