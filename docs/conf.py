@@ -57,7 +57,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'mainline'
-copyright = u'2015, Trevor Joynson'
+copyright = u'2025, Trevor Joynson'
 author = u'Trevor Joynson'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -395,4 +395,6 @@ epub_exclude_files = ['search.html']
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {
+  'python': ('https://docs.python.org/3', None),
+}
