@@ -192,8 +192,6 @@ Tox is used to handle testing multiple python versions.
     tox
 
 
-.. |ci-badge| image:: https://circleci.com/gh/akatrevorjay/mainline.svg?style=svg
-   :target: https://circleci.com/gh/akatrevorjay/mainline
 .. |coverage-badge| image:: https://coveralls.io/repos/akatrevorjay/mainline/badge.svg?branch=develop&service=github
    :target: https://coveralls.io/github/akatrevorjay/mainline?branch=develop
 .. |docs-badge| image:: https://readthedocs.org/projects/mainline/badge/?version=latest
