@@ -87,7 +87,7 @@ Scopes can be passed to :func:`~mainline.di.Di.register_factory` as scope object
 The default scope is :class:`~mainline.scope.NoneScope`, which means a new instance is created every time. The only exception to this rule is :func:`~mainline.di.Di.set_instance`, which defaults to a :class:`~mainline.scope.GlobalScope` if no provider exists under this key.
 
 Scopes available by default for factory registration are: :class:`~mainline.scope.GlobalScope` (:class:`~mainline.scope.SingletonScope`), :class:`~mainline.scope.ThreadScope`, :class:`~mainline.scope.ProcessScope` and :class:`~mainline.scope.NoneScope`.
-However, you may provide your own custom scopes as well by providing any object class/instance that supports a :class:`collections.MutableMapping` interface.
+However, you may provide your own custom scopes as well by providing any object class/instance that supports a :class:`typing.MutableMapping` interface.
 
 .. testsetup::
     >>> di = Di()

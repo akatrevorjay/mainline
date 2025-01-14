@@ -18,13 +18,12 @@ Why
 ---
 
 - Pure Python, so it basically works everywhere.
-  Tested against cPython `3.5`, `3.6`, `3.7` in addition to `2.7`.
+  Tested against cPython `3.11`.
   PyPy/PyPy3 are also fully supported.
 
 - Only external dependencies are `six` and `wrapt`, both of which you're likely to already have.
 
 - Supports using function annotations in Python `3.x`.
-  This is in addition to a standard syntax that works with both `3.x` and `2.7`.
 
 - Your method signature is fully preserved, maintaining introspection ability.
   (Minus any injected arguments of course.)

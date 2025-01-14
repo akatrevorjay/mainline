@@ -1,4 +1,5 @@
 import inspect
+import typing
 import six
 import abc
 
@@ -31,7 +32,7 @@ class ProviderMapping(ProxyMutableMapping):
         If arg is an ICatalog, we update from it's ._providers attribute.
 
         :param arg: Di/Catalog/Mapping to update from.
-        :type arg: ICatalog or collections.Mapping
+        :type arg: ICatalog or typing.Mapping
         :param allow_overwrite: If True, allow overwriting existing keys
         :type allow_overwrite: bool
         """
