@@ -7,7 +7,7 @@ mainline
 
 Simple yet powerful python dependency injection.
 
-|ci-badge| |coverage-badge| |docs-badge|
+|coverage-badge| |docs-badge|
 
 - Docs: http://mainline.readthedocs.org/en/latest
 - API Docs: http://mainline.readthedocs.org/en/latest/mainline.html
